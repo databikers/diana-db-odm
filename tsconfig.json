@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "target": "ES2022",
+    "declaration": true,
+    "noImplicitAny": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "resolveJsonModule": true,
+    "outDir": "dist",
+    "baseUrl": ".",
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@connection": ["src/connection"],
+      "@controller": ["src/controller"],
+      "@const": ["src/constants"],
+      "@dto": ["src/dto"],
+      "@vent-emitter": ["src/event-emitter"],
+      "@error": ["src/error"],
+      "@helper": ["src/helpers"],
+      "@model": ["src/model"],
+      "@options": ["src/options"],
+      "@parameters": ["src/parameters"],
+      "@queue": ["src/queue-processor"],
+      "@schema": ["src/schema"],
+      "@ttl-map": ["src/ttl-map"],
+      "@validate": ["src/validator"]
+    }
+  },
+  "include": [
+    "src/**/*"
+  ]
+}
