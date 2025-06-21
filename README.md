@@ -1,10 +1,6 @@
-# DianaDb ODM for Node.js project
-
-DianaDb ODM for Node.js project
+# [https://diana-db.com/](DianaDb)
 
 ## Install DianaDb
-
-Install DianaDb
 
 ```
 $npm i -s @diana-db/odm
