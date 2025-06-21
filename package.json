@@ -1,6 +1,6 @@
 {
   "name": "@diana-db/odm",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "ODM for DianaDB",
   "author": "Data Bikers Limited",
   "license": "MIT",
@@ -40,5 +40,8 @@
   "bugs": {
     "url": "https://github.com/databikers/diana-db-odm/issues"
   },
-  "homepage": "https://github.com/databikers/diana-db-odm#readme"
+  "homepage": "https://github.com/databikers/diana-db-odm#readme",
+  "publishConfig": {
+    "access": "public"
+  }
 }
