@@ -20,7 +20,7 @@
       "@controller": ["src/controller"],
       "@const": ["src/constants"],
       "@dto": ["src/dto"],
-      "@vent-emitter": ["src/event-emitter"],
+      "@event-emitter": ["src/event-emitter"],
       "@error": ["src/error"],
       "@helper": ["src/helpers"],
       "@model": ["src/model"],
