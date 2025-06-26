@@ -197,6 +197,7 @@ export class Model<T> {
   }
 
   public async init(): Promise<void> {
+    this.initialized = true;
     const collectionExists: boolean = await this.checkCollectionExistence();
     if (collectionExists) {
       const remoteSchema: Schema<T> = await this.getRemoteSchema();
@@ -207,6 +208,7 @@ export class Model<T> {
     } else {
       return this.createCollection();
     }
+
   }
 
   protected async checkCollectionExistence(): Promise<boolean> {
