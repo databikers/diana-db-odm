@@ -1,6 +1,6 @@
 import { DianaDbOptions } from '@options';
 import { Connection } from './connection';
-import { eventEmitter } from '@vent-emitter';
+import { eventEmitter } from '@event-emitter';
 import { CONNECT_EVENT } from '@const';
 import { v4 } from 'uuid';
 
@@ -24,6 +24,10 @@ export class ConnectionManager {
     }
   }
 
+  public get controller() {
+    return this.options.dianaDb.controller;
+  }
+
   private setupConnections() {
     const requestGroupId = v4();
     const { user, password, host, port, logger, connectionPoolSize } = this.options;
@@ -36,6 +40,7 @@ export class ConnectionManager {
         logger,
         reconnectTimeout: 1000,
         requestGroupId,
+        connectionManager: this,
       });
       this.connections.push(connection);
     }
@@ -48,5 +53,6 @@ export class ConnectionManager {
 
   public async disconnect(): Promise<void> {
     await Promise.all(this.connections.map((connection: Connection) => connection.disconnect()));
+    this.options.logger.log(`Connection to ${this.options.host}:${this.options.port} was closed`);
   }
 }

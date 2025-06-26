@@ -1,4 +1,5 @@
 import { Logger } from '@dto';
+import { DianaDb } from '../diana-db';
 
 export type DianaDbOptions = {
   host: string;
@@ -8,4 +9,5 @@ export type DianaDbOptions = {
   connectionPoolSize: number;
   connectTimeoutValue?: number;
   logger?: Logger;
+  dianaDb?: DianaDb;
 };

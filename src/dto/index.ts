@@ -8,3 +8,4 @@ export * from './transform-query';
 export * from './update-query';
 export * from './logger';
 export * from './transaction-info';
+export * from './migration';

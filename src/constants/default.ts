@@ -1,3 +1,2 @@
-import { resolve } from 'path';
 export const DEFAULT_CONNECT_TIMEOUT_VALUE = 30000;
 export const DEFAULT_REQUEST_TIMEOUT_VALUE = 10000;

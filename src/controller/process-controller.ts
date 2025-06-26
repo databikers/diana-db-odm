@@ -1,8 +1,8 @@
 import { Request } from '@dto';
 import { Processor } from '../dto/processor';
-import { Connection } from '@connection';
+import { ConnectionManager } from '@connection';
 import { eventKeyHelper } from '@helper';
-import { eventEmitter } from '@vent-emitter';
+import { eventEmitter } from '@event-emitter';
 import { ErrorFactory } from '@error';
 import { ServerResponse } from '@parameters';
 import { ServerAction } from '@const';
@@ -11,13 +11,17 @@ import { TtlMap } from '@ttl-map';
 export class ProcessController implements Processor<any> {
   private timeouts: Map<string, any>;
   private ttlMap: TtlMap;
+  private connectionManager: ConnectionManager;
+  static instance: ProcessController;
 
-  constructor() {
+  constructor(connectionManager: ConnectionManager) {
     this.timeouts = new Map<string, any>();
     this.ttlMap = new TtlMap();
+    this.connectionManager = connectionManager;
+    ProcessController.instance = this;
   }
 
-  public async processRequest(request: Request<any>, connection: Connection) {
+  public async processRequest(request: Request<any>) {
     const { clientRequestId, action } = request;
     const responseKey = eventKeyHelper(clientRequestId, 'response');
     const errorKey = eventKeyHelper(clientRequestId, 'error');
@@ -30,7 +34,7 @@ export class ProcessController implements Processor<any> {
           eventEmitter.removeAllListeners(errorKey);
         }, request.timeoutValue),
       );
-      connection.makeRequest(request);
+      this.connectionManager.connection.makeRequest(request);
     });
   }
 
@@ -50,11 +54,9 @@ export class ProcessController implements Processor<any> {
     } else if (action === ServerAction.PUBLISH) {
       const { requestId } = response;
       if (!this.ttlMap.has(requestId)) {
-        this.ttlMap.set(requestId, 1, 5000);
+        this.ttlMap.set(requestId, 1, 10000);
         eventEmitter.emit(ServerAction.PUBLISH, response);
       }
     }
   }
 }
-
-export const processController = new ProcessController();

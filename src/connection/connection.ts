@@ -4,7 +4,6 @@ import { Socket } from 'net';
 import { ConnectOptions } from '@options';
 import { CryptoHelper } from '@helper';
 import { Request } from '@dto';
-import { responseQueue } from '@queue';
 
 export class Connection {
   private eventEmitter: EventEmitter;
@@ -13,7 +12,6 @@ export class Connection {
   private _connected: boolean;
   private _connecting: boolean;
   private _started: boolean;
-  private timeouts: Map<string, any>;
   private rawDataString: string;
 
   constructor(options: ConnectOptions) {
@@ -51,7 +49,6 @@ export class Connection {
     this.socket.addListener('connect', () => {
       this._connected = true;
       this._connecting = false;
-      this.options.logger.log(`Connected to ${this.options.host}:${this.options.port}.`);
       this.socket.write(`user:${this.options.user}\n`);
       if (callback) {
         callback();
@@ -63,7 +60,6 @@ export class Connection {
       this.socket.end();
     });
     this.socket.addListener('close', () => {
-      this.options.logger.log(`Reconnection to ${this.options.host}:${this.options.port}...`);
       this._connected = false;
       if (this._started && !this._connecting) {
         setTimeout(() => {
@@ -87,7 +83,7 @@ export class Connection {
             : CryptoHelper.decrypt(this.options.password, dataStringGroup[i]);
           this.rawDataString = '';
           response = JSON.parse(decryptedData);
-          responseQueue.enqueue(response);
+          this.options.connectionManager.controller.processResponse(response).catch(console.error);
         }
       } catch (e) {
         this.rawDataString += dataStringGroup[i];

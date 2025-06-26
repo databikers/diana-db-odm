@@ -1,3 +1,4 @@
+import { v4 } from 'uuid';
 import {
   ClientAction,
   DEFAULT_CONNECT_TIMEOUT_VALUE,
@@ -5,26 +6,20 @@ import {
   INITIALIZE_EVENT,
   ServerAction,
 } from '@const';
-import { Request, TransactionInfo } from '@dto';
+import { Request, TransactionInfo, Migration } from '@dto';
+import { DatabaseUpdate, ManageTransactionParameters, ServerResponse, StartTransactionParameters } from '@parameters';
+import { eventEmitter } from '@event-emitter';
 import { DianaDbOptions } from '@options';
-import { Connection, ConnectionManager } from '@connection';
-import { QueueProcessor, requestQueue, responseQueue } from '@queue';
-import { processController } from '@controller';
-import { ManageTransactionParameters, ServerResponse, StartTransactionParameters } from '@parameters';
+import { ConnectionManager } from '@connection';
+import { ProcessController } from '@controller';
 import { Validator } from '@validate';
-import { eventEmitter } from '@vent-emitter';
-import { Migration } from './dto/migration';
 import { ErrorFactory } from '@error';
-import { v4 } from 'uuid';
 import { eventKeyHelper } from '@helper';
-import * as console from 'console';
-import { DatabaseUpdate } from '@parameters';
 
 export class DianaDb {
-  private options: DianaDbOptions;
-  private connectionManager: ConnectionManager;
-  private requestProcessor: QueueProcessor<any>;
-  private responseProcessor: QueueProcessor<any>;
+  private readonly options: DianaDbOptions;
+  private readonly connectionManager: ConnectionManager;
+  public readonly controller: ProcessController;
   private migrations: Map<number, Migration>;
   private subscribers: Map<string, (DatabaseUpdate: DatabaseUpdate) => void>;
 
@@ -36,18 +31,8 @@ export class DianaDb {
     }
     this.migrations = new Map<number, Migration>();
     this.subscribers = new Map<string, (data: any) => {}>();
-    this.connectionManager = new ConnectionManager(this.options);
-    this.requestProcessor = new QueueProcessor({
-      queue: requestQueue,
-      connectionManager: this.connectionManager,
-      processor: (request: Request<any>, connection: Connection) =>
-        processController.processRequest(request, connection),
-    });
-    this.responseProcessor = new QueueProcessor({
-      queue: responseQueue,
-      connectionManager: this.connectionManager,
-      processor: (response: ServerResponse<any>) => processController.processResponse(response),
-    });
+    this.connectionManager = new ConnectionManager({ ...this.options, dianaDb: this });
+    this.controller = new ProcessController(this.connectionManager);
     eventEmitter.on(ServerAction.PUBLISH, (DatabaseUpdate: DatabaseUpdate) => this.onPublish(DatabaseUpdate));
   }
 
@@ -67,11 +52,11 @@ export class DianaDb {
     return new Promise<boolean>((resolve, reject) => {
       const connectTimeout = setTimeout(() => {
         eventEmitter.removeAllListeners(INITIALIZE_EVENT);
-        reject(`ODM is ready now`);
+        reject(`Connection to the DianaDb Server was rejected by timeout.`);
       }, connectTimeoutValue);
       eventEmitter.on(INITIALIZE_EVENT, () => {
         clearTimeout(connectTimeout);
-        this.options.logger.log(`ODM started`);
+        this.options.logger.log(`ODM is ready`);
         resolve(true);
       });
       this.connectionManager.connect(this.options.connectTimeoutValue || DEFAULT_CONNECT_TIMEOUT_VALUE).catch(reject);
@@ -79,8 +64,6 @@ export class DianaDb {
   }
 
   public disconnect(): Promise<void> {
-    this.requestProcessor.stopProcessing();
-    this.responseProcessor.stopProcessing();
     return this.connectionManager.disconnect();
   }
 
@@ -177,7 +160,7 @@ export class DianaDb {
         eventEmitter.removeAllListeners(errorKey);
         return reject(new Error(error));
       });
-      requestQueue.enqueue(request as Request<any>);
+      this.controller.processRequest(request as Request<any>).catch(reject);
     });
   }
 }

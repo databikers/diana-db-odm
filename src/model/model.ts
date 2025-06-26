@@ -3,12 +3,12 @@ import { ClientAction, DEFAULT_REQUEST_TIMEOUT_VALUE, INITIALIZE_EVENT, Types } 
 import { ModelOptions, ValidatorOptions } from '@options';
 import { FindQuery, Request, Sorting, UpdateData, TransformQuery } from '@dto';
 import { Validator } from '@validate';
-import { eventEmitter } from '../event-emitter';
+import { eventEmitter } from '@event-emitter';
 import { ServerResponse } from '@parameters';
-import { requestQueue } from '@queue';
 import { Schema } from '@schema';
 import { eventKeyHelper, compareSchemas } from '@helper';
 import { ErrorFactory } from '@error';
+import { ProcessController } from '@controller';
 
 export class Model<T> {
   private initialized: boolean;
@@ -192,7 +192,7 @@ export class Model<T> {
         eventEmitter.removeAllListeners(errorKey);
         return reject(new Error(error));
       });
-      requestQueue.enqueue(request as Request<T>);
+      ProcessController.instance?.processRequest(request as Request<T>).catch(reject);
     });
   }
 
