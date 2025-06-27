@@ -10,7 +10,7 @@ import { Request, TransactionInfo, Migration } from '@dto';
 import { DatabaseUpdate, ManageTransactionParameters, ServerResponse, StartTransactionParameters } from '@parameters';
 import { eventEmitter } from '@event-emitter';
 import { DianaDbOptions } from '@options';
-import { ConnectionManager } from '@connection';
+import {Connection, ConnectionManager} from '@connection';
 import { ProcessController } from '@controller';
 import { Validator } from '@validate';
 import { ErrorFactory } from '@error';
@@ -22,6 +22,7 @@ export class DianaDb {
   public readonly controller: ProcessController;
   private migrations: Map<number, Migration>;
   private subscribers: Map<string, (DatabaseUpdate: DatabaseUpdate) => void>;
+  private subscribersConnection: Connection;
 
   constructor(options: DianaDbOptions) {
     Validator.clientOptions(options);
@@ -136,7 +137,19 @@ export class DianaDb {
     return this.request(request);
   }
 
-  public subscribe(key: string, subscriber: (DatabaseUpdate: DatabaseUpdate) => void): void {
+  public async subscribe(key: string, subscriber: (DatabaseUpdate: DatabaseUpdate) => void): Promise<void> {
+    if (!this.subscribersConnection) {
+      this.subscribersConnection = new Connection({
+        host: this.options.host,
+        port: this.options.port,
+        user: this.options.user,
+        connectionManager: this.connectionManager,
+        password: this.options.password,
+        reconnectTimeout: 10,
+        isSubscriber: true
+      });
+      await this.subscribersConnection.connect(this.options.connectTimeoutValue || DEFAULT_CONNECT_TIMEOUT_VALUE)
+    }
     this.subscribers.set(key, subscriber);
   }
 
