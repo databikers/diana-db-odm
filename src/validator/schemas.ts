@@ -45,7 +45,7 @@ const stringField = joi.alternatives(
     $replace: joi.array().min(3).max(3).items(joi.string()),
   }),
 );
-const objectIdField = joi.string().regex(/^[0-9a-f]{12}-[0-9a-f]{4}-[0-9a-f]{11}-[0-9a-f]{9}$/);
+const objectIdField = joi.string().regex(/^[0-9a-f]{12}-[0-9a-f]{1,}-[0-9a-f]{11}-[0-9a-f]{9}$/);
 
 const timeFieldItem = joi.object({
   amount: joi.number().positive().integer().required(),
