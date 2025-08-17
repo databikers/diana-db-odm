@@ -34,7 +34,7 @@ export class ProcessController implements Processor<any> {
           eventEmitter.removeAllListeners(errorKey);
         }, request.timeoutValue),
       );
-      this.connectionManager.connection.makeRequest(request);
+      this.connectionManager.connection?.makeRequest(request);
     });
   }
 
