@@ -2,7 +2,7 @@
 
 _Reimagining NoSQL with schema enforcement, columnar speed, and developer-first design_
 
-📚 **Documentation**: [https://diana-db.com/odm](https://diana-db.com/odm)
+📚 **Documentation**: [https://diana-db.com/odm/overview](https://diana-db.com/odm/overview)
 
 ---
 
