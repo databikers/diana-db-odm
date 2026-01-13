@@ -1,24 +1,41 @@
 import crypto, { Cipher, Decipher } from 'crypto';
-const algorithm = 'aes-256-cbc';
+const ALGORITHM = 'aes-256-gcm';
+const KEY_LEN = 32;
+const SALT_LEN = 16;
+const IV_LEN = 12;
+const TAG_LEN = 16;
 
 export class CryptoHelper {
-  public static encrypt(key: string, text: string): string {
-    const encryptedKey: string = crypto.createHash('md5').update(key).digest('hex');
-    const cipher: Cipher = crypto.createCipheriv(algorithm, Buffer.from(encryptedKey), encryptedKey.substr(0, 16));
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return encrypted;
+  public static encrypt(password: string, plaintext: string) {
+    const salt = crypto.randomBytes(SALT_LEN);
+    const iv = crypto.randomBytes(IV_LEN);
+    const key = crypto.scryptSync(password, salt, KEY_LEN);
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+    const ciphertext = Buffer.concat([
+      cipher.update(plaintext),
+      cipher.final(),
+    ]);
+    const tag = cipher.getAuthTag();
+    return Buffer.concat([
+      salt,
+      iv,
+      tag,
+      ciphertext,
+    ]).toString();
   }
 
-  public static decrypt(key: string, text: string): string {
-    const encryptedKey: string = crypto.createHash('md5').update(key).digest('hex');
-    const decipher: Decipher = crypto.createDecipheriv(
-      algorithm,
-      Buffer.from(encryptedKey),
-      encryptedKey.substr(0, 16),
-    );
-    let decrypted = decipher.update(text, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
+  public static decrypt(password: string, text: string) {
+    const encrypted = Buffer.from(text);
+    const salt = encrypted.subarray(0, SALT_LEN);
+    const iv = encrypted.subarray(SALT_LEN, SALT_LEN + IV_LEN);
+    const tag = encrypted.subarray(SALT_LEN + IV_LEN, SALT_LEN + IV_LEN + TAG_LEN);
+    const ciphertext = encrypted.subarray(SALT_LEN + IV_LEN + TAG_LEN);
+    const key = crypto.scryptSync(password, salt, KEY_LEN);
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final(),
+    ]).toString();
   }
 }

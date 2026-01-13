@@ -10,7 +10,7 @@ import { Request, TransactionInfo, Migration } from '@dto';
 import { DatabaseUpdate, ManageTransactionParameters, ServerResponse, StartTransactionParameters } from '@parameters';
 import { eventEmitter } from '@event-emitter';
 import { DianaDbOptions } from '@options';
-import {Connection, ConnectionManager} from '@connection';
+import { Connection, ConnectionManager } from '@connection';
 import { ProcessController } from '@controller';
 import { Validator } from '@validate';
 import { ErrorFactory } from '@error';
@@ -146,9 +146,9 @@ export class DianaDb {
         connectionManager: this.connectionManager,
         password: this.options.password,
         reconnectTimeout: 10,
-        isSubscriber: true
+        isSubscriber: true,
       });
-      await this.subscribersConnection.connect(this.options.connectTimeoutValue || DEFAULT_CONNECT_TIMEOUT_VALUE)
+      await this.subscribersConnection.connect(this.options.connectTimeoutValue || DEFAULT_CONNECT_TIMEOUT_VALUE);
     }
     this.subscribers.set(key, subscriber);
   }

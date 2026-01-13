@@ -8,6 +8,7 @@ export type DianaDbOptions = {
   password: string;
   connectionPoolSize: number;
   connectTimeoutValue?: number;
+  reconnectTimeout?: number;
   logger?: Logger;
   dianaDb?: DianaDb;
 };
