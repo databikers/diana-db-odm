@@ -4,7 +4,6 @@ import { Socket } from 'net';
 import { ConnectOptions } from '@options';
 import { CryptoHelper } from '@helper';
 import { Request } from '@dto';
-import {clearTimeout} from "timers";
 
 export class Connection {
   private eventEmitter: EventEmitter;
