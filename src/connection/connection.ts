@@ -4,6 +4,7 @@ import { Socket } from 'net';
 import { ConnectOptions } from '@options';
 import { CryptoHelper } from '@helper';
 import { Request } from '@dto';
+import {clearTimeout} from "timers";
 
 export class Connection {
   private eventEmitter: EventEmitter;
@@ -30,7 +31,10 @@ export class Connection {
       const connectTimeout = setTimeout(() => {
         reject(new Error(`Connect timeout exceeded for ${this.options.host}:${this.options.port}`));
       }, connectTimeoutValue);
-      this.setupSocket(() => resolve());
+      this.setupSocket(() => {
+        clearTimeout(connectTimeout);
+        resolve();
+      });
       this.socket.connect({ host: this.options.host, port: this.options.port });
     });
   }
