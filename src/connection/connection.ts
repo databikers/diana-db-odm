@@ -52,7 +52,9 @@ export class Connection {
     this.socket.addListener('connect', () => {
       this._connected = true;
       this._connecting = false;
-      const firstMessage = this.options.isSubscriber ? `user:${this.options.user}:subscriber\n` : `user:${this.options.user}\n`;
+      const firstMessage = this.options.isSubscriber
+        ? `user:${this.options.user}:subscriber\n`
+        : `user:${this.options.user}\n`;
       this.socket.write(firstMessage);
       if (callback) {
         callback();
