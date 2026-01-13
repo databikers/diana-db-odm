@@ -21,11 +21,11 @@ export class CryptoHelper {
       iv,
       tag,
       ciphertext,
-    ]).toString();
+    ]).toString('base64');
   }
 
   public static decrypt(password: string, text: string) {
-    const encrypted = Buffer.from(text);
+    const encrypted = Buffer.from(text, 'base64');
     const salt = encrypted.subarray(0, SALT_LEN);
     const iv = encrypted.subarray(SALT_LEN, SALT_LEN + IV_LEN);
     const tag = encrypted.subarray(SALT_LEN + IV_LEN, SALT_LEN + IV_LEN + TAG_LEN);
