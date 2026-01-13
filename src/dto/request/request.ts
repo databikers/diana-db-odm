@@ -21,4 +21,5 @@ export interface Request<T> {
   autoRollbackAfterMS?: number;
   migration?: number;
   timeoutValue?: number;
+  distinctKey?: string;
 }

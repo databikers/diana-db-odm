@@ -106,6 +106,19 @@ export class Model<T> {
     return this.request(request);
   }
 
+  public async distinct(key: string): Promise<T[]> {
+    if (!this.initialized) {
+      await this.init();
+    }
+    const request: Partial<Request<T>> = {
+      database: this.options.database,
+      collection: this.options.collection,
+      action: ClientAction.DISTINCT,
+      distinctKey: key,
+    };
+    return this.request(request);
+  }
+
   public async count(filterQueries: FindQuery<T>[], transformQueries?: TransformQuery<T>[], transactionId?: string) {
     if (!this.initialized) {
       await this.init();
@@ -208,7 +221,6 @@ export class Model<T> {
     } else {
       return this.createCollection();
     }
-
   }
 
   protected async checkCollectionExistence(): Promise<boolean> {
