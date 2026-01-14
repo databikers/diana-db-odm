@@ -79,9 +79,9 @@ export class Validator<T> {
     }
   }
 
-  public requiredFields(data: any) {
+  public requiredFields(data: any, update: boolean = false) {
     for (const key in this.options.schema) {
-      if (this.options.schema[key]?.required && !Object.prototype.hasOwnProperty.apply(data, [key])) {
+      if (!update && this.options.schema[key]?.required && !Object.prototype.hasOwnProperty.apply(data, [key])) {
         throw ErrorFactory.requiredFieldError(
           `property '${key}' is required in the '${this.options.name}' collection's Schema`,
         );
