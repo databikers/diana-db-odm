@@ -41,7 +41,7 @@ export class Model<T> {
       throw ErrorFactory.schemaError(`document should be an object`, 'stored document');
     }
     for (const key in this.options.schema as Schema<T>) {
-      if (Object.prototype.hasOwnProperty.apply(this.options.schema[key], ['default'])) {
+      if (data[key] === undefined && Object.prototype.hasOwnProperty.apply(this.options.schema[key], ['default'])) {
         if (typeof this.options.schema[key].default === 'function') {
           data[key] = await this.options.schema[key].default.apply(data, []);
         } else {
@@ -73,6 +73,9 @@ export class Model<T> {
   ): Promise<T[]> {
     if (!this.initialized) {
       await this.init();
+    }
+    if (!Array.isArray(filterQueries)) {
+      filterQueries = [filterQueries];
     }
     this.validator.filterQueries(filterQueries);
     const request: Partial<Request<T>> = {
@@ -144,6 +147,9 @@ export class Model<T> {
     if (!this.initialized) {
       await this.init();
     }
+    if (!Array.isArray(filterQueries)) {
+      filterQueries = [filterQueries];
+    }
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
@@ -163,6 +169,9 @@ export class Model<T> {
   public async remove(filterQueries: FindQuery<T>[], transactionId?: string): Promise<any> {
     if (!this.initialized) {
       await this.init();
+    }
+    if (!Array.isArray(filterQueries)) {
+      filterQueries = [filterQueries];
     }
     const request: Partial<Request<T>> = {
       database: this.options.database,

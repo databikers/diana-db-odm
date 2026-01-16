@@ -42,7 +42,10 @@ const numberFieldExtended = joi.alternatives(
 const stringField = joi.alternatives(
   joi.string(),
   joi.object({
-    $concat: joi.string(),
+    $concat: joi.object({
+      delimiter: joi.string().required(),
+      parts: joi.array().items(joi.string()),
+    }),
     $replace: joi.array().min(3).max(3).items(joi.string()),
   }),
 );
@@ -261,9 +264,10 @@ const projectionSchema = joi
     $addToSet: joi.any(),
     $concatArray: joi.string(),
     $first: joi.string(),
-    $concatString: joi.object({
+    $last: joi.string(),
+    $concat: joi.object({
       delimiter: joi.string().required(),
-      localField: joi.string(),
+      parts: joi.array().items(joi.string()),
     }),
     $year: joi.string(),
     $month: joi.string(),

@@ -10,9 +10,10 @@ export type ProjectQueryItem = {
   $addToSet?: NotObject[];
   $concatArray?: string;
   $first?: string;
-  $concatString?: {
+  $last?: string;
+  $concat?: {
     delimiter: string;
-    localField: string;
+    parts: string[];
   };
   $year?: string;
   $month?: string;
