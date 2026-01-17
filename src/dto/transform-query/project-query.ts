@@ -1,13 +1,15 @@
-type NotObject = string | number;
+type NUmberOrString = string | number;
 
 export type ProjectQueryItem = {
-  $sum?: NotObject[];
-  $subtract?: NotObject[];
-  $divide?: NotObject[];
-  $multiply?: NotObject[];
-  $ifNull?: NotObject[];
-  $push?: NotObject;
-  $addToSet?: NotObject[];
+  $max?: NUmberOrString;
+  $min?: NUmberOrString;
+  $avg?: NUmberOrString;
+  $subtract?: NUmberOrString[];
+  $divide?: NUmberOrString[];
+  $multiply?: NUmberOrString[];
+  $ifNull?: NUmberOrString[];
+  $push?: NUmberOrString;
+  $addToSet?: NUmberOrString[];
   $concatArray?: string;
   $first?: string;
   $last?: string;
