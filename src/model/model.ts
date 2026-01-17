@@ -122,6 +122,32 @@ export class Model<T> {
     return this.request(request);
   }
 
+  public async max(key: string): Promise<T[]> {
+    if (!this.initialized) {
+      await this.init();
+    }
+    const request: Partial<Request<T>> = {
+      database: this.options.database,
+      collection: this.options.collection,
+      action: ClientAction.MAX,
+      distinctKey: key,
+    };
+    return this.request(request);
+  }
+
+  public async min(key: string): Promise<T[]> {
+    if (!this.initialized) {
+      await this.init();
+    }
+    const request: Partial<Request<T>> = {
+      database: this.options.database,
+      collection: this.options.collection,
+      action: ClientAction.MIN,
+      distinctKey: key,
+    };
+    return this.request(request);
+  }
+
   public async count(filterQueries: FindQuery<T>[], transformQueries?: TransformQuery<T>[], transactionId?: string) {
     if (!this.initialized) {
       await this.init();

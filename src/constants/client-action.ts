@@ -2,6 +2,8 @@ export enum ClientAction {
   INSERT = 'insert',
   FIND = 'find',
   DISTINCT = 'distinct',
+  MAX = 'max',
+  MIN = 'min',
   UPDATE = 'update',
   REMOVE = 'remove',
   COUNT = 'count',
