@@ -1,6 +1,7 @@
 export enum ClientAction {
   INSERT = 'insert',
   FIND = 'find',
+  FIND_BY_VIEW = 'findByView',
   DISTINCT = 'distinct',
   MAX = 'max',
   MIN = 'min',
@@ -12,11 +13,14 @@ export enum ClientAction {
   ROLLBACK_TRANSACTION = 'rollbackTransaction',
   MIGRATE_UP = 'migrateUp',
   MIGRATE_DOWN = 'migrateDown',
-  GET_MIGRATIONS = 'getMigration',
+  GET_MIGRATIONS = 'getMigrations',
   ADD_COLLECTION = 'addCollection',
+  ADD_VIEW = 'addView',
+  REMOVE_VIEW = 'removeView',
   REMOVE_COLLECTION = 'removeCollection',
   UPDATE_COLLECTION = 'updateCollection',
   GET_COLLECTION_NAMES = 'getCollectionNames',
   GET_COLLECTION_SCHEMA = 'getCollectionSchema',
   GET_DATABASE_NAMES = 'getDatabaseNames',
+  CREATE_DATABASE = 'createDatabase',
 }

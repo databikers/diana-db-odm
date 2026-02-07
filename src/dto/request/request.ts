@@ -1,12 +1,13 @@
 import { ClientAction } from '@const';
-import { FindQuery } from '../find-query';
 import { Schema } from '@schema';
+import { FindQuery } from '../find-query';
 import { TransformQuery } from '../transform-query';
 
 export interface Request<T> {
   user?: string;
   database?: string;
   collection?: string;
+  view?: string;
   clientRequestId?: string;
   requestGroupId?: string;
   action: ClientAction;

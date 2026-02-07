@@ -63,10 +63,47 @@ export class Model<T> {
     return this.request(request);
   }
 
+  public createView(name: string, transformQueries?: TransformQuery<T>[]) {
+    const request: Partial<Request<T>> = {
+      database: this.options.database,
+      collection: this.options.collection,
+      action: ClientAction.ADD_VIEW,
+      transformQueries,
+      view: name
+    };
+    return this.request(request);
+  }
+
+  findByView(view: string, findQuery?: FindQuery<T>, sorting?: Sorting<any>, skip?: number, limit?: number) {
+    const request: Partial<Request<T>> = {
+      database: this.options.database,
+      collection: this.options.collection,
+      action: ClientAction.FIND_BY_VIEW,
+      filterQueries: [ findQuery ],
+      view
+    };
+    if (findQuery) {
+      this.validator.filterQueries([findQuery]);
+    }
+    if (sorting) {
+      this.validator.sortQuery(sorting);
+      request.sortQuery = sorting;
+    }
+    if (skip) {
+      this.validator.skip(skip);
+      request.skip = skip;
+    }
+    if (limit) {
+      this.validator.limit(limit);
+      request.limit = limit;
+    }
+    return this.request(request);
+  }
+
   public async find(
     filterQueries: FindQuery<T>[],
     transformQueries?: TransformQuery<T>[],
-    sortQuery?: Sorting<T>,
+    sorting?: Sorting<T>,
     skip?: number,
     limit?: number,
     transactionId?: string,
@@ -91,9 +128,9 @@ export class Model<T> {
       this.validator.transformQueries(transformQueries);
       request.transformQueries = transformQueries;
     }
-    if (sortQuery) {
-      this.validator.sortQuery(sortQuery);
-      request.sortQuery = sortQuery;
+    if (sorting) {
+      this.validator.sortQuery(sorting);
+      request.sortQuery = sorting;
     }
     if (skip) {
       this.validator.skip(skip);
