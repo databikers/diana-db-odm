@@ -70,7 +70,7 @@ export class Connection {
       if (this._started && !this._connecting) {
         setTimeout(() => {
           this.setupSocket();
-        }, this.options.reconnectTimeout);
+        }, this.options.reconnectTimeoutValue);
       }
     });
   }

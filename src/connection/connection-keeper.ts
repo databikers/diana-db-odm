@@ -1,8 +1,8 @@
-import { DianaDbOptions } from '@options';
-import { Connection } from './connection';
-import { eventEmitter } from '@event-emitter';
-import { CONNECT_EVENT } from '@const';
 import { v4 } from 'uuid';
+import { CONNECT_EVENT, DEFAULT_RECONNECT_TIMEOUT_VALUE } from '@const';
+import { DianaDbOptions } from '@options';
+import { eventEmitter } from '@event-emitter';
+import { Connection } from './connection';
 
 export class ConnectionManager {
   private options: DianaDbOptions;
@@ -38,7 +38,7 @@ export class ConnectionManager {
         host,
         port,
         logger,
-        reconnectTimeout: 1000,
+        reconnectTimeoutValue: this.options.reconnectTimeoutValue || DEFAULT_RECONNECT_TIMEOUT_VALUE,
         requestGroupId,
         connectionManager: this,
       });

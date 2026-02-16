@@ -24,7 +24,7 @@ export const clientOptions = joi.object({
   password: joi.string().required(),
   connectionPoolSize: joi.number().positive().integer().min(1),
   connectTimeoutValue: joi.number().positive().integer().min(100),
-  reconnectTimeout: joi.number().positive().integer().min(100),
+  reconnectTimeoutValue: joi.number().positive().integer().min(100),
   logger: joi.any(),
 });
 

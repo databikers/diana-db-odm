@@ -69,7 +69,7 @@ export class Model<T> {
       collection: this.options.collection,
       action: ClientAction.ADD_VIEW,
       transformQueries,
-      view: name
+      view: name,
     };
     return this.request(request);
   }
@@ -79,8 +79,8 @@ export class Model<T> {
       database: this.options.database,
       collection: this.options.collection,
       action: ClientAction.FIND_BY_VIEW,
-      filterQueries: [ findQuery ],
-      view
+      filterQueries: [findQuery],
+      view,
     };
     if (findQuery) {
       this.validator.filterQueries([findQuery]);

@@ -14,7 +14,7 @@ import { Connection, ConnectionManager } from '@connection';
 import { ProcessController } from '@controller';
 import { Validator } from '@validate';
 import { ErrorFactory } from '@error';
-import { eventKeyHelper } from '@helper';
+import { eventKeyHelper, parseConnectionString } from '@helper';
 
 export class DianaDb {
   private readonly options: DianaDbOptions;
@@ -24,7 +24,13 @@ export class DianaDb {
   private subscribers: Map<string, (DatabaseUpdate: DatabaseUpdate) => void>;
   private subscribersConnection: Connection;
 
-  constructor(options: DianaDbOptions) {
+  constructor(options: DianaDbOptions | string) {
+    if (typeof options === 'string') {
+      if (!options.startsWith('diana-db://')) {
+        throw ErrorFactory.configurationError(`invalid protocol`);
+      }
+      options = parseConnectionString(options);
+    }
     Validator.clientOptions(options);
     this.options = options;
     if (!this.options.logger) {
@@ -145,7 +151,7 @@ export class DianaDb {
         user: this.options.user,
         connectionManager: this.connectionManager,
         password: this.options.password,
-        reconnectTimeout: 10,
+        reconnectTimeoutValue: 10,
         isSubscriber: true,
       });
       await this.subscribersConnection.connect(this.options.connectTimeoutValue || DEFAULT_CONNECT_TIMEOUT_VALUE);
