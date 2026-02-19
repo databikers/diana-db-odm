@@ -22,7 +22,7 @@ export class ProcessController implements Processor<any> {
   }
 
   public async processRequest(request: Request<any>) {
-    const { clientRequestId, action } = request;
+    const { clientRequestId } = request;
     const responseKey = eventKeyHelper(clientRequestId, 'response');
     const errorKey = eventKeyHelper(clientRequestId, 'error');
     return new Promise((resolve, reject) => {
