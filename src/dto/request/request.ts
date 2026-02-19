@@ -20,7 +20,7 @@ export interface Request<T> {
   schema?: Schema<any>;
   transactionId?: string;
   autoRollbackAfterMS?: number;
-  migration?: number;
+  migration?: string;
   timeoutValue?: number;
   distinctKey?: string;
 }

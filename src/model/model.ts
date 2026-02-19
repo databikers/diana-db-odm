@@ -100,6 +100,20 @@ export class Model<T> {
     return this.request(request);
   }
 
+  countByView(view: string, findQuery?: FindQuery<T>) {
+    const request: Partial<Request<T>> = {
+      database: this.options.database,
+      collection: this.options.collection,
+      action: ClientAction.COUNT_BY_VIEW,
+      filterQueries: [findQuery],
+      view,
+    };
+    if (findQuery) {
+      this.validator.filterQueries([findQuery]);
+    }
+    return this.request(request);
+  }
+
   public async find(
     filterQueries: FindQuery<T>[],
     transformQueries?: TransformQuery<T>[],

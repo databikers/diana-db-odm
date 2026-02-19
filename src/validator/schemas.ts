@@ -86,17 +86,17 @@ const geoField = joi.object({
 
 const arrayExtended = joi
   .object({
-    $add: joi.any(),
-    $remove: joi.any(),
+    $addItem: joi.any(),
+    $removeItem: joi.any(),
   })
   .min(1);
 
 const arrayOfNumberField = joi.alternatives(joi.array().items(numberFieldExtended), arrayExtended);
 const arrayOfStringField = joi.alternatives(joi.array().items(stringField), arrayExtended);
-const arrayOfBooleanField = joi.alternatives(joi.array().items(booleanField), arrayExtended);
-const arrayOfTimeField = joi.alternatives(joi.array().items(timeField), arrayExtended);
-const arrayOfObjectIdField = joi.alternatives(joi.array().items(objectIdField), arrayExtended);
-const arrayOfGeoField = joi.alternatives(joi.array().items(geoField), arrayExtended);
+const arrayOfBooleanField = joi.array().items(booleanField);
+const arrayOfTimeField = joi.array().items(timeField);
+const arrayOfObjectIdField = joi.array().items(objectIdField);
+const arrayOfGeoField = joi.array().items(geoField);
 
 const numberQuery = joi.alternatives().try(
   joi.object({
@@ -203,7 +203,7 @@ const schemaItem = joi
         is: Types.ARRAY,
         then: joi
           .string()
-          .valid(...Object.values(Types))
+          .valid(Types.STRING, Types.NUMBER)
           .required(),
       })
       .when('type', {

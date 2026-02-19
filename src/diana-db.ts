@@ -86,14 +86,14 @@ export class DianaDb {
     const request: Request<any> = {
       action: ClientAction.GET_MIGRATIONS,
     };
-    const remoteMigrations: number[] = await this.request(request);
+    const remoteMigrations: string[] = await this.request(request);
     const ownMigrations = Array.from(this.migrations.values()).sort((a, b) => a.index - b.index);
     for (let i = 0; i < ownMigrations.length; i++) {
       const migration: Migration = ownMigrations[i];
-      if (!remoteMigrations.includes(migration.index)) {
+      if (!remoteMigrations.includes(migration.name)) {
         await migration.up();
         await this.request({
-          migration: migration.index,
+          migration: migration.name,
           action: ClientAction.MIGRATE_UP,
         });
       }
@@ -104,14 +104,14 @@ export class DianaDb {
     const request: Request<any> = {
       action: ClientAction.GET_MIGRATIONS,
     };
-    const remoteMigrations: number[] = await this.request(request);
+    const remoteMigrations: string[] = await this.request(request);
     const ownMigrations = Array.from(this.migrations.values()).sort((a, b) => a.index - b.index);
     for (let i = 0; i < ownMigrations.length; i++) {
       const migration: Migration = ownMigrations[i];
-      if (remoteMigrations.includes(migration.index)) {
+      if (remoteMigrations.includes(migration.name)) {
         await migration.down();
         await this.request({
-          migration: migration.index,
+          migration: migration.name,
           action: ClientAction.MIGRATE_DOWN,
         });
       }
@@ -121,7 +121,7 @@ export class DianaDb {
   public async startTransaction(startTransactionParameters: StartTransactionParameters): Promise<string> {
     const request: Partial<Request<any>> = {
       database: startTransactionParameters.database,
-      autoRollbackAfterMS: startTransactionParameters.autoRollbackAfterMS,
+      autoRollbackAfterMS: startTransactionParameters. autoRollBackAfterMs,
       action: ClientAction.START_TRANSACTION,
     };
     return this.request(request);
@@ -131,6 +131,7 @@ export class DianaDb {
     const request: Partial<Request<any>> = {
       database: manageTransactionParameters.database,
       action: ClientAction.COMMIT_TRANSACTION,
+      transactionId: manageTransactionParameters.transactionId
     };
     return this.request(request);
   }
@@ -139,6 +140,7 @@ export class DianaDb {
     const request: Partial<Request<any>> = {
       database: manageTransactionParameters.database,
       action: ClientAction.ROLLBACK_TRANSACTION,
+      transactionId: manageTransactionParameters.transactionId
     };
     return this.request(request);
   }
