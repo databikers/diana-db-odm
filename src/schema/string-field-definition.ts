@@ -3,4 +3,6 @@ import { FieldDefinition } from './field-definition';
 
 export type StringFieldDefinition = Omit<FieldDefinition<string>, 'type' | 'items'> & {
   type: Types.STRING;
+  uppercase?: boolean;
+  lowercase?: boolean;
 };
