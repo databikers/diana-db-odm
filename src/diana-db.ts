@@ -118,6 +118,20 @@ export class DianaDb {
     }
   }
 
+  public getDatabases(): Promise<string[]> {
+    const request: Partial<Request<any>> = {
+      action: ClientAction.GET_DATABASE_NAMES,
+    };
+    return this.request(request);
+  }
+
+  public getHealth(): Promise<Record<'memory' | 'cpu' | 'gcp'| 'elu' | 'eld', number>> {
+    const request: Partial<Request<any>> = {
+      action: ClientAction.GET_HEALTH,
+    };
+    return this.request(request);
+  }
+
   public async startTransaction(startTransactionParameters: StartTransactionParameters): Promise<string> {
     const request: Partial<Request<any>> = {
       database: startTransactionParameters.database,

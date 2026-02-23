@@ -24,4 +24,5 @@ export enum ClientAction {
   GET_COLLECTION_SCHEMA = 'getCollectionSchema',
   GET_DATABASE_NAMES = 'getDatabaseNames',
   CREATE_DATABASE = 'createDatabase',
+  GET_HEALTH = 'getHealth',
 }
