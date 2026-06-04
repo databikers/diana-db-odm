@@ -9,5 +9,5 @@ export type FieldDefinition<T> = {
   required?: boolean;
   unique?: true;
   mutable?: boolean;
-  default?: T | Function;
+  default?: T | DefaultSetter<T> | DefaultAsyncSetter<T>;
 };
