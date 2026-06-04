@@ -1,4 +1,3 @@
-import { v4 } from 'uuid';
 import { ClientAction, DEFAULT_REQUEST_TIMEOUT_VALUE, INITIALIZE_EVENT, Types } from '@const';
 import { ModelOptions, ValidatorOptions } from '@options';
 import { FindQuery, Request, Sorting, UpdateData, TransformQuery } from '@dto';
@@ -6,7 +5,7 @@ import { Validator } from '@validate';
 import { eventEmitter } from '@event-emitter';
 import { ServerResponse } from '@parameters';
 import { Schema } from '@schema';
-import { eventKeyHelper, compareSchemas } from '@helper';
+import { eventKeyHelper, compareSchemas, randomId } from '@helper';
 import { ErrorFactory } from '@error';
 import { ProcessController } from '@controller';
 
@@ -264,7 +263,7 @@ export class Model<T> {
   }
 
   protected request(request: Partial<Request<T>>): Promise<any> {
-    const clientRequestId = v4();
+    const clientRequestId = randomId();
     const { action } = request;
     request.clientRequestId = clientRequestId;
     if (!request.timeoutValue) {

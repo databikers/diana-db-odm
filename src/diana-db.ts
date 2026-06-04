@@ -1,4 +1,3 @@
-import { v4 } from 'uuid';
 import {
   ClientAction,
   DEFAULT_CONNECT_TIMEOUT_VALUE,
@@ -9,12 +8,12 @@ import {
 import { Request, TransactionInfo, Migration } from '@dto';
 import { DatabaseUpdate, ManageTransactionParameters, ServerResponse, StartTransactionParameters } from '@parameters';
 import { eventEmitter } from '@event-emitter';
+import { eventKeyHelper, parseConnectionString, randomId } from '@helper';
 import { DianaDbOptions } from '@options';
 import { Connection, ConnectionManager } from '@connection';
 import { ProcessController } from '@controller';
 import { Validator } from '@validate';
 import { ErrorFactory } from '@error';
-import { eventKeyHelper, parseConnectionString } from '@helper';
 
 export class DianaDb {
   private readonly options: DianaDbOptions;
@@ -37,7 +36,7 @@ export class DianaDb {
       this.options.logger = console;
     }
     this.migrations = new Map<number, Migration>();
-    this.subscribers = new Map<string, (data: any) => {}>();
+    this.subscribers = new Map<string, (data: any) => any>();
     this.connectionManager = new ConnectionManager({ ...this.options, dianaDb: this });
     this.controller = new ProcessController(this.connectionManager);
     eventEmitter.on(ServerAction.PUBLISH, (DatabaseUpdate: DatabaseUpdate) => this.onPublish(DatabaseUpdate));
@@ -125,7 +124,7 @@ export class DianaDb {
     return this.request(request);
   }
 
-  public getHealth(): Promise<Record<'memory' | 'cpu' | 'gcp'| 'elu' | 'eld', number>> {
+  public getHealth(): Promise<Record<'memory' | 'cpu' | 'gcp' | 'elu' | 'eld', number>> {
     const request: Partial<Request<any>> = {
       action: ClientAction.GET_HEALTH,
     };
@@ -135,7 +134,7 @@ export class DianaDb {
   public async startTransaction(startTransactionParameters: StartTransactionParameters): Promise<string> {
     const request: Partial<Request<any>> = {
       database: startTransactionParameters.database,
-      autoRollbackAfterMS: startTransactionParameters. autoRollBackAfterMs,
+      autoRollbackAfterMS: startTransactionParameters.autoRollBackAfterMs,
       action: ClientAction.START_TRANSACTION,
     };
     return this.request(request);
@@ -145,7 +144,7 @@ export class DianaDb {
     const request: Partial<Request<any>> = {
       database: manageTransactionParameters.database,
       action: ClientAction.COMMIT_TRANSACTION,
-      transactionId: manageTransactionParameters.transactionId
+      transactionId: manageTransactionParameters.transactionId,
     };
     return this.request(request);
   }
@@ -154,7 +153,7 @@ export class DianaDb {
     const request: Partial<Request<any>> = {
       database: manageTransactionParameters.database,
       action: ClientAction.ROLLBACK_TRANSACTION,
-      transactionId: manageTransactionParameters.transactionId
+      transactionId: manageTransactionParameters.transactionId,
     };
     return this.request(request);
   }
@@ -176,7 +175,7 @@ export class DianaDb {
   }
 
   protected request(request: Partial<Request<any>>): Promise<any> {
-    const clientRequestId = v4();
+    const clientRequestId = randomId();
     request.clientRequestId = clientRequestId;
     if (!request.timeoutValue) {
       request.timeoutValue = DEFAULT_REQUEST_TIMEOUT_VALUE;

@@ -1,8 +1,8 @@
-import { v4 } from 'uuid';
 import { CONNECT_EVENT, DEFAULT_RECONNECT_TIMEOUT_VALUE } from '@const';
 import { DianaDbOptions } from '@options';
 import { eventEmitter } from '@event-emitter';
 import { Connection } from './connection';
+import { randomId } from '@helper';
 
 export class ConnectionManager {
   private options: DianaDbOptions;
@@ -29,7 +29,7 @@ export class ConnectionManager {
   }
 
   private setupConnections() {
-    const requestGroupId = v4();
+    const requestGroupId = randomId();
     const { user, password, host, port, logger, connectionPoolSize } = this.options;
     for (let i = 0; i < connectionPoolSize; i = i + 1) {
       const connection = new Connection({
