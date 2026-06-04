@@ -11,27 +11,25 @@
     "build": "rm -rf dist && tsc && node_modules/.bin/tsc-alias && eslint src/**/*.ts{,x}",
     "eslint": "eslint src --ext .ts",
     "prettier-check": "prettier . --check",
-    "format": "prettier .  --write"
+    "format": "prettier .  --write",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "@types/joi": "^14.3.4",
-    "@types/node": "22.19.5",
-    "@types/prettier": "2.6.0",
-    "@types/uuid": "10.0.0",
-    "@types/winston": "^2.4.4",
-    "@typescript-eslint/eslint-plugin": "6.17.0",
-    "@typescript-eslint/parser": "6.17.0",
-    "eslint": "8.47.0",
-    "husky": "3.0.0",
-    "prettier": "3.3.3",
-    "prettier-plugin-multiline-arrays": "3.0.6",
-    "ts-node": "10.9.2",
-    "tsc-alias": "1.8.10",
-    "typescript": "5.3.3"
+    "@types/joi": "^17.2.3",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "24.12.0",
+    "@types/prettier": "3.0.0",
+    "@typescript-eslint/eslint-plugin": "8.58.0",
+    "@typescript-eslint/parser": "8.58.0",
+    "eslint": "10.4.1",
+    "husky": "^9.1.7",
+    "prettier-plugin-multiline-arrays": "4.1.8",
+    "tsc-alias": "^1.8.17",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.60.1"
   },
   "dependencies": {
-    "joi": "17.13.3",
-    "uuid": "11.1.0"
+    "joi": "18.2.1"
   },
   "repository": {
     "type": "git",
