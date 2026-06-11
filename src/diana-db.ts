@@ -1,5 +1,6 @@
 import {
   ClientAction,
+  CONNECT_EVENT,
   DEFAULT_CONNECT_TIMEOUT_VALUE,
   DEFAULT_REQUEST_TIMEOUT_VALUE,
   INITIALIZE_EVENT,
@@ -14,6 +15,9 @@ import { Connection, ConnectionManager } from '@connection';
 import { ProcessController } from '@controller';
 import { Validator } from '@validate';
 import { ErrorFactory } from '@error';
+
+let connectTimeout: any;
+let isInitialized: boolean = false;
 
 export class DianaDb {
   private readonly options: DianaDbOptions;
@@ -56,14 +60,23 @@ export class DianaDb {
 
   public async connect(connectTimeoutValue: number): Promise<boolean> {
     return new Promise<boolean>((resolve, reject) => {
-      const connectTimeout = setTimeout(() => {
+      clearTimeout(connectTimeout);
+      connectTimeout = setTimeout(() => {
         eventEmitter.removeAllListeners(INITIALIZE_EVENT);
         reject(`Connection to the DianaDb Server was rejected by timeout.`);
       }, connectTimeoutValue);
       eventEmitter.on(INITIALIZE_EVENT, () => {
+        isInitialized = true;
         clearTimeout(connectTimeout);
         this.options.logger.log(`ODM is ready`);
         resolve(true);
+      });
+      eventEmitter.on(CONNECT_EVENT, () => {
+        if (isInitialized) {
+          clearTimeout(connectTimeout);
+          this.options.logger.log(`ODM is ready`);
+          resolve(true);
+        }
       });
       this.connectionManager.connect(this.options.connectTimeoutValue || DEFAULT_CONNECT_TIMEOUT_VALUE).catch(reject);
     });
