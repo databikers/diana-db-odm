@@ -47,6 +47,8 @@ export class ConnectionManager {
   }
 
   public async connect(connectTimeoutValue: number): Promise<void> {
+    this.connections = [];
+    this.setupConnections();
     await Promise.race(this.connections.map((connection: Connection) => connection.connect(connectTimeoutValue)));
     eventEmitter.emit(CONNECT_EVENT);
   }
