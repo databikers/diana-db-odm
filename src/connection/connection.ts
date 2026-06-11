@@ -40,12 +40,14 @@ export class Connection {
 
   public disconnect() {
     this._started = false;
+    this.socket.removeAllListeners();
     this.socket.destroy();
   }
 
   private setupSocket(callback?: () => void) {
     this._connecting = true;
     if (this.socket) {
+      this.socket.removeAllListeners();
       this.socket.end();
     }
     this.socket = new Socket();
