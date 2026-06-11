@@ -1,4 +1,5 @@
 .idea
+.husky
 *.lock
 tsconfig.json
 .editorconfig
@@ -8,3 +9,4 @@ tsconfig.json
 .npmignore
 src/
 sandbox/
+eslint.config.js
