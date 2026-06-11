@@ -68,12 +68,14 @@ export class DianaDb {
       eventEmitter.on(INITIALIZE_EVENT, () => {
         isInitialized = true;
         clearTimeout(connectTimeout);
+        eventEmitter.removeAllListeners(INITIALIZE_EVENT);
         this.options.logger.log(`ODM is ready`);
         resolve(true);
       });
       eventEmitter.on(CONNECT_EVENT, () => {
         if (isInitialized) {
           clearTimeout(connectTimeout);
+          eventEmitter.removeAllListeners(CONNECT_EVENT);
           this.options.logger.log(`ODM is ready`);
           resolve(true);
         }
