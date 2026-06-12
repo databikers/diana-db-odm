@@ -63,20 +63,19 @@ export class DianaDb {
       clearTimeout(connectTimeout);
       connectTimeout = setTimeout(() => {
         eventEmitter.removeAllListeners(INITIALIZE_EVENT);
-        reject(`Connection to the DianaDb Server was rejected by timeout.`);
+        reject(`Connection to the DianaDb Server ${this.options.host}:${this.options.port} was rejected by timeout.`);
       }, connectTimeoutValue);
       eventEmitter.on(INITIALIZE_EVENT, () => {
         isInitialized = true;
         clearTimeout(connectTimeout);
         eventEmitter.removeAllListeners(INITIALIZE_EVENT);
-        this.options.logger.log(`ODM is ready`);
+        this.options.logger.log(`DianaDB ODM is ready`);
         resolve(true);
       });
       eventEmitter.on(CONNECT_EVENT, () => {
         if (isInitialized) {
           clearTimeout(connectTimeout);
           eventEmitter.removeAllListeners(CONNECT_EVENT);
-          this.options.logger.log(`ODM is ready`);
           resolve(true);
         }
       });
@@ -135,6 +134,14 @@ export class DianaDb {
   public getDatabases(): Promise<string[]> {
     const request: Partial<Request<any>> = {
       action: ClientAction.GET_DATABASE_NAMES,
+    };
+    return this.request(request);
+  }
+
+  public getCollections(database: string): Promise<string[]> {
+    const request: Partial<Request<any>> = {
+      action: ClientAction.GET_COLLECTION_NAMES,
+      database,
     };
     return this.request(request);
   }
