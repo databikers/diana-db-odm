@@ -146,6 +146,15 @@ export class DianaDb {
     return this.request(request);
   }
 
+  public getCollectionSchema(database: string, collection: string): Promise<string[]> {
+    const request: Partial<Request<any>> = {
+      action: ClientAction.GET_COLLECTION_SCHEMA,
+      database,
+      collection,
+    };
+    return this.request(request);
+  }
+
   public getHealth(): Promise<Record<'memory' | 'cpu' | 'gcp' | 'elu' | 'eld', number>> {
     const request: Partial<Request<any>> = {
       action: ClientAction.GET_HEALTH,
