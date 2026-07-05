@@ -41,6 +41,8 @@ export class ConnectionManager {
         reconnectTimeoutValue: this.options.reconnectTimeoutValue || DEFAULT_RECONNECT_TIMEOUT_VALUE,
         requestGroupId,
         connectionManager: this,
+        secureServer: this.options.secureServer,
+        tls: this.options.tls,
       });
       this.connections.push(connection);
     }

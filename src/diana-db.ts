@@ -29,7 +29,7 @@ export class DianaDb {
 
   constructor(options: DianaDbOptions | string) {
     if (typeof options === 'string') {
-      if (!options.startsWith('diana-db://')) {
+      if (!options.startsWith('diana-db://') && !options.startsWith('diana-dbs://')) {
         throw ErrorFactory.configurationError(`invalid protocol`);
       }
       options = parseConnectionString(options);

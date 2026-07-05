@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { Socket } from 'net';
+import { connect as tlsConnect, TLSSocket } from 'tls';
 
 import { ConnectOptions } from '@options';
 import { CryptoHelper } from '@helper';
@@ -9,6 +10,7 @@ export class Connection {
   private eventEmitter: EventEmitter;
   private options: ConnectOptions;
   private socket: Socket;
+  private activeSocket: Socket | TLSSocket;
   private _connected: boolean;
   private _connecting: boolean;
   private _started: boolean;
@@ -40,6 +42,8 @@ export class Connection {
 
   public disconnect() {
     this._started = false;
+    this.activeSocket?.removeAllListeners();
+    this.activeSocket?.destroy();
     this.socket.removeAllListeners();
     this.socket.destroy();
   }
@@ -48,25 +52,42 @@ export class Connection {
     this._connecting = true;
     if (this.socket) {
       this.socket.removeAllListeners();
+      this.activeSocket?.removeAllListeners();
       this.socket.end();
     }
     this.socket = new Socket();
+
     this.socket.addListener('connect', () => {
-      this._connected = true;
-      this._connecting = false;
-      const firstMessage = this.options.isSubscriber
-        ? `user:${this.options.user}:subscriber\n`
-        : `user:${this.options.user}\n`;
-      this.socket.write(firstMessage);
-      if (callback) {
-        callback();
+      if (this.options.secureServer) {
+        const tlsSocket = tlsConnect(
+          {
+            socket: this.socket,
+            rejectUnauthorized: false,
+            requestCert: true,
+            ...(this.options.tls || {}),
+          },
+          () => {
+            this.onSecureReady(tlsSocket, callback);
+          },
+        );
+        this.activeSocket = tlsSocket;
+        this.activeSocket.on('data', (data: string) => this.onData(data));
+        this.activeSocket.on('error', (error: Error) => {
+          this.options.logger.error(error);
+          this.activeSocket.end();
+        });
+      } else {
+        this.activeSocket = this.socket;
+        this.activeSocket.on('data', (data: string) => this.onData(data));
+        this.onSecureReady(this.activeSocket, callback);
       }
     });
-    this.socket.on('data', (data: string) => this.onData(data));
+
     this.socket.on('error', (error: Error) => {
       this.options.logger.error(error);
       this.socket.end();
     });
+
     this.socket.addListener('close', () => {
       this._connected = false;
       if (this._started && !this._connecting) {
@@ -76,6 +97,19 @@ export class Connection {
       }
     });
   }
+
+  private onSecureReady(socket: Socket | TLSSocket, callback?: () => void) {
+    this._connected = true;
+    this._connecting = false;
+    const firstMessage = this.options.isSubscriber
+      ? `user:${this.options.user}:subscriber\n`
+      : `user:${this.options.user}\n`;
+    socket.write(firstMessage);
+    if (callback) {
+      callback();
+    }
+  }
+
   private onData(data: string): void {
     let response: any;
     const dataString: string = data.toString();
@@ -106,6 +140,6 @@ export class Connection {
 
   private write(request: Request<any>): void {
     const data = CryptoHelper.encrypt(this.options.password, JSON.stringify(request));
-    this.socket.write(data + '\n');
+    this.activeSocket.write(data + '\n');
   }
 }

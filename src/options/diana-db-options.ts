@@ -11,4 +11,11 @@ export type DianaDbOptions = {
   reconnectTimeoutValue?: number;
   logger?: Logger;
   dianaDb?: DianaDb;
+  secureServer?: boolean;
+  tls?: {
+    cert: Buffer;
+    key: Buffer;
+    ca?: Buffer;
+    rejectUnauthorized?: boolean;
+  };
 };

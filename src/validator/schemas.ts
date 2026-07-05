@@ -25,6 +25,7 @@ export const clientOptions = joi.object({
   connectionPoolSize: joi.number().positive().integer().min(1),
   connectTimeoutValue: joi.number().positive().integer().min(100),
   reconnectTimeoutValue: joi.number().positive().integer().min(100),
+  secureServer: joi.boolean(),
   logger: joi.any(),
 });
 
@@ -201,10 +202,7 @@ const schemaItem = joi
     items: joi
       .when('type', {
         is: Types.ARRAY,
-        then: joi
-          .string()
-          .valid(Types.STRING, Types.NUMBER)
-          .required(),
+        then: joi.string().valid(Types.STRING, Types.NUMBER).required(),
       })
       .when('type', {
         not: Types.ARRAY,

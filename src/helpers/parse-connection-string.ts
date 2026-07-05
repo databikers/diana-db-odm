@@ -9,6 +9,7 @@ import {
 
 export function parseConnectionString(connectionString: string): DianaDbOptions {
   const connectionData = new URL(connectionString);
+  const secureServer = connectionString.startsWith('diana-dbs://');
   const { connectionPoolSize, connectTimeoutValue, reconnectTimeoutValue } = connectionData.searchParams as any;
   return {
     user: connectionData.username,
@@ -18,5 +19,6 @@ export function parseConnectionString(connectionString: string): DianaDbOptions 
     connectionPoolSize: connectionPoolSize ? parseInt(connectionPoolSize) : DEFAULT_CONNECTION_PULL_SIZE,
     connectTimeoutValue: connectTimeoutValue ? parseInt(connectTimeoutValue) : DEFAULT_CONNECT_TIMEOUT_VALUE,
     reconnectTimeoutValue: reconnectTimeoutValue ? parseInt(reconnectTimeoutValue) : DEFAULT_RECONNECT_TIMEOUT_VALUE,
+    secureServer,
   };
 }
