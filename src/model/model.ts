@@ -68,6 +68,12 @@ export class Model<T> {
   }
 
   public createView(name: string, transformQueries?: TransformQuery<T>[]) {
+    if (!name || typeof name !== 'string') {
+      throw ErrorFactory.argumentError(`View name should be a string`);
+    }
+    if (!Array.isArray(transformQueries)) {
+      throw ErrorFactory.argumentError(`View transformQueries should be an array of a valid TransformQuery objects`);
+    }
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
@@ -79,6 +85,12 @@ export class Model<T> {
   }
 
   findByView(view: string, findQuery?: FindQuery<T>, sorting?: Sorting<any>, skip?: number, limit?: number) {
+    if (!view || typeof view !== 'string') {
+      throw ErrorFactory.argumentError(`View name should be a string`);
+    }
+    if (!findQuery) {
+      findQuery = {};
+    }
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
@@ -105,6 +117,12 @@ export class Model<T> {
   }
 
   countByView(view: string, findQuery?: FindQuery<T>) {
+    if (!view || typeof view !== 'string') {
+      throw ErrorFactory.argumentError(`View name should be a string`);
+    }
+    if (!findQuery) {
+      findQuery = {};
+    }
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
@@ -231,15 +249,15 @@ export class Model<T> {
     if (!Array.isArray(filterQueries)) {
       filterQueries = [filterQueries];
     }
+    this.validator.filterQueries(filterQueries);
+    this.validator.mutableFields(updateData);
+    this.validator.data(updateData, true);
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
       action: ClientAction.UPDATE,
     };
-    this.validator.filterQueries(filterQueries);
     request.filterQueries = filterQueries;
-    this.validator.mutableFields(updateData);
-    this.validator.data(updateData, true);
     request.setData = updateData;
     if (transactionId) {
       request.transactionId = transactionId;
@@ -254,6 +272,7 @@ export class Model<T> {
     if (!Array.isArray(filterQueries)) {
       filterQueries = [filterQueries];
     }
+    this.validator.filterQueries(filterQueries);
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
@@ -262,7 +281,6 @@ export class Model<T> {
     if (transactionId) {
       request.transactionId = transactionId;
     }
-    this.validator.filterQueries(filterQueries);
     request.filterQueries = filterQueries;
     return this.request(request);
   }

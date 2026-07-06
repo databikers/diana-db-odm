@@ -7,6 +7,10 @@ export class ErrorFactory {
     return ErrorFactory.construct(`Model Options Error: ${message}`);
   }
 
+  public static argumentError(message: string) {
+    return ErrorFactory.construct(`Invalid argument: ${message}`);
+  }
+
   public static findQueryError(message: string) {
     return ErrorFactory.construct(`Find Query Error: ${message}`);
   }
