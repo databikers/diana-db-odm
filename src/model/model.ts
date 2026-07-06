@@ -325,7 +325,7 @@ export class Model<T> {
       const isDifferent: boolean = this.compareSchemas(schema);
       if (isDifferent) {
         if (locked) {
-          throw new ErrorFactory.remoteSchemaError(
+          throw ErrorFactory.remoteSchemaError(
             `Schema mismatch: collection ${this.options.collection} is locked on the remote server, and its schema differs from the local one`,
           );
         } else {
