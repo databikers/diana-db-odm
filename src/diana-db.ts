@@ -15,6 +15,7 @@ import { Connection, ConnectionManager } from '@connection';
 import { ProcessController } from '@controller';
 import { Validator } from '@validate';
 import { ErrorFactory } from '@error';
+import { Schema } from '@schema';
 
 let connectTimeout: any;
 let isInitialized: boolean = false;
@@ -146,7 +147,31 @@ export class DianaDb {
     return this.request(request);
   }
 
-  public getCollectionSchema(database: string, collection: string): Promise<string[]> {
+  public getCollectionSchema<T>(database: string, collection: string): Promise<{ schema: Schema<T>; locked: boolean }> {
+    const request: Partial<Request<any>> = {
+      action: ClientAction.GET_COLLECTION_SCHEMA,
+      database,
+      collection,
+    };
+    return this.request(request);
+  }
+
+  public async lockCollectionSchema<T>(
+    database: string,
+    collection: string,
+  ): Promise<{ schema: Schema<T>; locked: boolean }> {
+    const request: Partial<Request<any>> = {
+      action: ClientAction.GET_COLLECTION_SCHEMA,
+      database,
+      collection,
+    };
+    return this.request(request);
+  }
+
+  public async unlockCollectionSchema<T>(
+    database: string,
+    collection: string,
+  ): Promise<{ schema: Schema<T>; locked: boolean }> {
     const request: Partial<Request<any>> = {
       action: ClientAction.GET_COLLECTION_SCHEMA,
       database,

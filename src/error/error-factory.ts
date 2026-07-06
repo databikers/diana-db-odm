@@ -27,6 +27,10 @@ export class ErrorFactory {
     return ErrorFactory.construct(`Schema Error(${key}): ${message}`);
   }
 
+  public static remoteSchemaError(message: string) {
+    return ErrorFactory.construct(`Schema Config Error: ${message}`);
+  }
+
   public static configurationError(message: string) {
     return ErrorFactory.construct(`000 Configuration Error: ${message}`);
   }

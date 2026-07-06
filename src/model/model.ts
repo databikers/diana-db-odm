@@ -10,11 +10,16 @@ import { ErrorFactory } from '@error';
 import { ProcessController } from '@controller';
 
 export class Model<T> {
-  private initialized: boolean;
   private static instances: Model<any>[] = [];
+  private initialized: boolean;
+  private _locked: boolean;
 
   protected options: ModelOptions<T>;
   protected validator: Validator<T>;
+
+  public get locked() {
+    return this._locked;
+  }
 
   constructor(options: ModelOptions<T>) {
     Validator.validateModelOptions(options);
@@ -298,10 +303,16 @@ export class Model<T> {
     this.initialized = true;
     const collectionExists: boolean = await this.checkCollectionExistence();
     if (collectionExists) {
-      const remoteSchema: Schema<T> = await this.getRemoteSchema();
-      const isDifferent: boolean = this.compareSchemas(remoteSchema);
+      const { schema, locked } = await this.getRemoteSchema();
+      const isDifferent: boolean = this.compareSchemas(schema);
       if (isDifferent) {
-        return this.updateSchema();
+        if (locked) {
+          throw new ErrorFactory.remoteSchemaError(
+            `Schema mismatch: collection ${this.options.collection} is locked on the remote server, and its schema differs from the local one`,
+          );
+        } else {
+          return this.updateSchema();
+        }
       }
     } else {
       return this.createCollection();
@@ -337,7 +348,7 @@ export class Model<T> {
     return schema as Schema<T>;
   }
 
-  protected async getRemoteSchema(): Promise<Schema<T>> {
+  protected async getRemoteSchema(): Promise<{ schema: Schema<T>; locked: boolean }> {
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
@@ -358,5 +369,27 @@ export class Model<T> {
       schema: this.getConvertedSchema(),
     };
     return this.request(request);
+  }
+
+  public async lock(): Promise<{ collection: string; locked: boolean }> {
+    const request: Partial<Request<T>> = {
+      database: this.options.database,
+      collection: this.options.collection,
+      action: ClientAction.LOCK_COLLECTION_SCHEMA,
+    };
+    const result = await this.request(request);
+    this._locked = result?.locked;
+    return result;
+  }
+
+  public async unlock(): Promise<{ collection: string; locked: boolean }> {
+    const request: Partial<Request<T>> = {
+      database: this.options.database,
+      collection: this.options.collection,
+      action: ClientAction.UNLOCK_COLLECTION_SCHEMA,
+    };
+    const result = await this.request(request);
+    this._locked = result?.locked;
+    return result;
   }
 }
