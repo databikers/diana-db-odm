@@ -6,7 +6,7 @@ import {
   INITIALIZE_EVENT,
   ServerAction,
 } from '@const';
-import { Request, TransactionInfo, Migration } from '@dto';
+import { Request, TransactionInfo, Migration, TransformQuery } from '@dto';
 import { DatabaseUpdate, ManageTransactionParameters, ServerResponse, StartTransactionParameters } from '@parameters';
 import { eventEmitter } from '@event-emitter';
 import { eventKeyHelper, parseConnectionString, randomId } from '@helper';
@@ -156,7 +156,7 @@ export class DianaDb {
     return this.request(request);
   }
 
-  public async lockCollectionSchema<T>(
+  public lockCollectionSchema<T>(
     database: string,
     collection: string,
   ): Promise<{ schema: Schema<T>; locked: boolean }> {
@@ -168,12 +168,24 @@ export class DianaDb {
     return this.request(request);
   }
 
-  public async unlockCollectionSchema<T>(
+  public unlockCollectionSchema<T>(
     database: string,
     collection: string,
   ): Promise<{ schema: Schema<T>; locked: boolean }> {
     const request: Partial<Request<any>> = {
       action: ClientAction.UNLOCK_COLLECTION_SCHEMA,
+      database,
+      collection,
+    };
+    return this.request(request);
+  }
+
+  public getCollectionViews<T>(
+    database: string,
+    collection: string,
+  ): Promise<Record<string, { transformQueries: TransformQuery<T>[] }>> {
+    const request: Partial<Request<any>> = {
+      action: ClientAction.GET_COLLECTION_VIEWS,
       database,
       collection,
     };

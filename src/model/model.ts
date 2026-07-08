@@ -410,4 +410,13 @@ export class Model<T> {
     this._locked = result?.locked;
     return result;
   }
+
+  public async getViews(): Promise<Record<string, { transformQueries: TransformQuery<T>[] }>> {
+    const request: Partial<Request<T>> = {
+      database: this.options.database,
+      collection: this.options.collection,
+      action: ClientAction.GET_COLLECTION_VIEWS,
+    };
+    return this.request(request);
+  }
 }
