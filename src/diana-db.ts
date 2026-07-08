@@ -161,7 +161,7 @@ export class DianaDb {
     collection: string,
   ): Promise<{ schema: Schema<T>; locked: boolean }> {
     const request: Partial<Request<any>> = {
-      action: ClientAction.GET_COLLECTION_SCHEMA,
+      action: ClientAction.LOCK_COLLECTION_SCHEMA,
       database,
       collection,
     };
@@ -173,7 +173,7 @@ export class DianaDb {
     collection: string,
   ): Promise<{ schema: Schema<T>; locked: boolean }> {
     const request: Partial<Request<any>> = {
-      action: ClientAction.GET_COLLECTION_SCHEMA,
+      action: ClientAction.UNLOCK_COLLECTION_SCHEMA,
       database,
       collection,
     };
