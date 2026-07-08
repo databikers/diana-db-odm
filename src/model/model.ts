@@ -84,6 +84,20 @@ export class Model<T> {
     return this.request(request);
   }
 
+  public removeView(name: string) {
+    if (!name || typeof name !== 'string') {
+      throw ErrorFactory.argumentError(`View name should be a string`);
+    }
+
+    const request: Partial<Request<T>> = {
+      database: this.options.database,
+      collection: this.options.collection,
+      action: ClientAction.REMOVE_VIEW,
+      view: name,
+    };
+    return this.request(request);
+  }
+
   findByView(view: string, findQuery?: FindQuery<T>, sorting?: Sorting<any>, skip?: number, limit?: number) {
     if (!view || typeof view !== 'string') {
       throw ErrorFactory.argumentError(`View name should be a string`);
