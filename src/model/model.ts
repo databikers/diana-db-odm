@@ -67,7 +67,10 @@ export class Model<T> {
     return this.request(request);
   }
 
-  public createView(name: string, transformQueries?: TransformQuery<T>[]) {
+  public async createView(name: string, transformQueries?: TransformQuery<T>[]) {
+    if (!this.initialized) {
+      await this.init();
+    }
     if (!name || typeof name !== 'string') {
       throw ErrorFactory.argumentError(`View name should be a string`);
     }
@@ -84,7 +87,10 @@ export class Model<T> {
     return this.request(request);
   }
 
-  public removeView(name: string) {
+  public async removeView(name: string) {
+    if (!this.initialized) {
+      await this.init();
+    }
     if (!name || typeof name !== 'string') {
       throw ErrorFactory.argumentError(`View name should be a string`);
     }
@@ -98,7 +104,16 @@ export class Model<T> {
     return this.request(request);
   }
 
-  findByView(view: string, findQuery?: FindQuery<T>, sorting?: Sorting<any>, skip?: number, limit?: number) {
+  public async findByView(
+    view: string,
+    findQuery?: FindQuery<T>,
+    sorting?: Sorting<any>,
+    skip?: number,
+    limit?: number,
+  ) {
+    if (!this.initialized) {
+      await this.init();
+    }
     if (!view || typeof view !== 'string') {
       throw ErrorFactory.argumentError(`View name should be a string`);
     }
@@ -130,7 +145,10 @@ export class Model<T> {
     return this.request(request);
   }
 
-  countByView(view: string, findQuery?: FindQuery<T>) {
+  public async countByView(view: string, findQuery?: FindQuery<T>) {
+    if (!this.initialized) {
+      await this.init();
+    }
     if (!view || typeof view !== 'string') {
       throw ErrorFactory.argumentError(`View name should be a string`);
     }
