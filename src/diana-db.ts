@@ -139,6 +139,13 @@ export class DianaDb {
     return this.request(request);
   }
 
+  public getVersion(): Promise<{ version: string }> {
+    const request: Partial<Request<any>> = {
+      action: ClientAction.GET_VERSION,
+    };
+    return this.request(request);
+  }
+
   public getCollections(database: string): Promise<string[]> {
     const request: Partial<Request<any>> = {
       action: ClientAction.GET_COLLECTION_NAMES,
