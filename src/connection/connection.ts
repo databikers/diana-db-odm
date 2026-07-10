@@ -81,11 +81,13 @@ export class Connection {
         this.activeSocket.on('data', (data: string) => this.onData(data));
         this.onSecureReady(this.activeSocket, callback);
       }
+      this._connecting = false;
     });
 
     this.socket.on('error', (error: Error) => {
       this.options.logger.error(error);
       this.socket.end();
+      this._connecting = false;
     });
 
     this.socket.addListener('close', () => {
@@ -93,6 +95,7 @@ export class Connection {
       if (this._started && !this._connecting) {
         setTimeout(() => {
           this.setupSocket();
+          this.socket.connect({ host: this.options.host, port: this.options.port });
         }, this.options.reconnectTimeoutValue);
       }
     });
