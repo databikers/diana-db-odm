@@ -21,7 +21,6 @@ import {
   arrayOfGeoField,
   geoQuery,
   sortQuery,
-  configurationOptions,
   clientOptions,
   modelOptions,
 } from './schemas';

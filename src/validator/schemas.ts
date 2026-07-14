@@ -2,20 +2,7 @@ import { Types, UnitOfTime, Weekday } from '@const';
 
 const joi = require('joi');
 
-const configurationOptions = joi.object({
-  port: joi.number().positive().integer().min(1025).max(65535),
-  workersCount: joi.number().positive().integer().min(1),
-  transactionsMinAutoRollBackValue: joi.number().positive().integer(),
-  transactionsMaxAutoRollBackValue: joi.number().positive().integer(),
-  dumpCreateInterval: joi.string().valid('day', 'hour'),
-  dumpDirectory: joi.string().regex(/^(^[\/]{1})|(^[\.]{1,2})\//),
-  logsDirectory: joi.string().regex(/^(^[\/]{1})|(^[\.]{1,2})\//),
-  logsTtlValue: joi
-    .string()
-    .regex(/^\d+d$/)
-    .required(),
-  currentDumpName: joi.string(),
-});
+const pointer = joi.string().regex(/^\$[A-Za-z]+[A-Za-z0-9_]+/);
 
 export const clientOptions = joi.object({
   port: joi.number().positive().integer().min(1025).max(65535).required(),
@@ -31,17 +18,19 @@ export const clientOptions = joi.object({
 
 const numberFieldExtended = joi.alternatives(
   joi.number(),
+  pointer,
   joi.object({
     $add: joi.number().positive(),
     $subtract: joi.number().positive(),
     $multiply: joi.number().positive(),
     $divide: joi.number().positive(),
-    $round: joi.number().positive().integer().min(1).max(8),
+    $round: joi.number().positive().integer().min(0).max(8),
   }),
 );
 
 const stringField = joi.alternatives(
   joi.string(),
+  pointer,
   joi.object({
     $concat: joi.object({
       delimiter: joi.string().required(),
@@ -50,7 +39,10 @@ const stringField = joi.alternatives(
     $replace: joi.array().min(3).max(3).items(joi.string()),
   }),
 );
-const objectIdField = joi.string().regex(/^[0-9a-f]{12}-[0-9a-f]{1,}-[0-9a-f]{11}-[0-9a-f]{9}$/);
+const objectIdField = joi.alternatives(
+  pointer,
+  joi.string().regex(/^[0-9a-f]{12}-[0-9a-f]{1,}-[0-9a-f]{11}-[0-9a-f]{9}$/),
+);
 
 const timeFieldItem = joi.object({
   amount: joi.number().positive().integer().required(),
@@ -67,6 +59,7 @@ const unitOfTime = joi.string().valid(...Object.values(UnitOfTime));
 const timeField = joi.alternatives(
   joi.string().isoDate(),
   joi.number().positive().integer(),
+  pointer,
   joi
     .object({
       $add: timeFieldItem,
@@ -78,19 +71,23 @@ const timeField = joi.alternatives(
     })
     .min(1),
 );
-const booleanField = joi.boolean().allow(true, false);
+const booleanField = joi.alternatives(joi.boolean().allow(true, false), pointer, joi.number().allow(0, 1));
 
-const geoField = joi.object({
-  x: joi.number().required(),
-  y: joi.number().required(),
-});
+const geoField = joi.alternatives(
+  joi.object({
+    x: joi.number().required(),
+    y: joi.number().required(),
+  }),
+  pointer,
+);
 
 const arrayExtended = joi
   .object({
     $addItem: joi.any(),
     $removeItem: joi.any(),
   })
-  .min(1);
+  .min(1)
+  .max(1);
 
 const arrayOfNumberField = joi.alternatives(joi.array().items(numberFieldExtended), arrayExtended);
 const arrayOfStringField = joi.alternatives(joi.array().items(stringField), arrayExtended);
@@ -202,19 +199,13 @@ const schemaItem = joi
     items: joi
       .when('type', {
         is: Types.ARRAY,
-        then: joi.string().valid(Types.STRING, Types.NUMBER).required(),
+        then: joi
+          .string()
+          .valid(...Object.values(Types))
+          .required(),
       })
       .when('type', {
         not: Types.ARRAY,
-        then: joi.forbidden(),
-      }),
-    precision: joi
-      .when('type', {
-        is: Types.NUMBER,
-        then: joi.number().positive().integer().allow(0).min(0).max(8).required(),
-      })
-      .when('type', {
-        not: Types.NUMBER,
         then: joi.forbidden(),
       }),
     uppercase: joi
@@ -235,6 +226,15 @@ const schemaItem = joi
         not: Types.STRING,
         then: joi.forbidden(),
       }),
+    precision: joi
+      .when('type', {
+        is: Types.NUMBER,
+        then: joi.number().positive().integer().allow(0).min(0).max(8).required(),
+      })
+      .when('type', {
+        not: Types.NUMBER,
+        then: joi.forbidden(),
+      }),
     reference: joi
       .when('type', {
         is: Types.REFERENCE,
@@ -246,8 +246,8 @@ const schemaItem = joi
       }),
     required: joi.boolean(),
     unique: joi.boolean(),
-    mutable: joi.boolean(),
     default: joi.any(),
+    mutable: joi.boolean(),
     ttl: joi
       .when('type', {
         not: Types.TIME,
@@ -270,6 +270,13 @@ const schemaItem = joi
   .oxor('lowercase', 'uppercase')
   .min(1);
 
+export const modelOptions = joi.object({
+  database: joi.string().required(),
+  collection: joi.string().required(),
+  name: joi.string().required(),
+  schema: joi.object().pattern(/^/, schemaItem).min(1),
+});
+
 const projectionSchema = joi
   .object({
     $sum: joi.array().items(joi.string(), joi.number(), joi.any()),
@@ -277,9 +284,9 @@ const projectionSchema = joi
     $divide: joi.array().items(joi.string(), joi.number(), joi.any()),
     $multiply: joi.array().items(joi.string(), joi.number(), joi.any()),
     $ifNull: joi.array().items(joi.string(), joi.number(), joi.any()),
-    $max: joi.string().regex(/^\$/),
-    $min: joi.string().regex(/^\$/),
-    $avg: joi.string().regex(/^\$/),
+    $max: pointer,
+    $min: pointer,
+    $avg: pointer,
     $push: joi.any(),
     $addToSet: joi.any(),
     $concatArray: joi.string(),
@@ -298,7 +305,7 @@ const projectionSchema = joi
     $dayOfWeek: joi.string(),
     $dayOfYear: joi.string(),
     $timestamp: joi.string(),
-    $round: joi.number().positive().integer(),
+    $round: joi.number().positive().integer().allow(0),
   })
   .min(1)
   .max(1);
@@ -339,17 +346,7 @@ const sortQuery = joi.alternatives(
   joi.object().pattern(/^/, joi.number().integer().allow(-1, 1)).min(1),
 );
 
-const schema = joi.object().pattern(/^/, schemaItem).min(1);
-
-export const modelOptions = joi.object({
-  database: joi.string().required(),
-  collection: joi.string().required(),
-  name: joi.string().required(),
-  schema,
-});
-
 export {
-  configurationOptions,
   numberFieldExtended,
   stringField,
   timeField,
