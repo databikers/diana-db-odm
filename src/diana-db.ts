@@ -249,6 +249,45 @@ export class DianaDb {
     this.subscribers.set(key, subscriber);
   }
 
+  public createCollection<T>(
+    database: string,
+    collection: string,
+    schema: Schema<T>,
+  ): Promise<{ collection: string; action: string }> {
+    const request: Partial<Request<any>> = {
+      action: ClientAction.ADD_COLLECTION,
+      database,
+      collection,
+      schema,
+    };
+    return this.request(request);
+  }
+
+  public removeCollection<T>(database: string, collection: string): Promise<{ schema: Schema<T>; locked: boolean }> {
+    const request: Partial<Request<any>> = {
+      action: ClientAction.REMOVE_COLLECTION,
+      database,
+      collection,
+    };
+    return this.request(request);
+  }
+
+  public removeDatabase(database: string): Promise<{ database: string; actions: string }> {
+    const request: Partial<Request<any>> = {
+      action: ClientAction.REMOVE_DATABASE,
+      database,
+    };
+    return this.request(request);
+  }
+
+  public createDatabase(database: string): Promise<{ database: string; actions: string }> {
+    const request: Partial<Request<any>> = {
+      action: ClientAction.CREATE_DATABASE,
+      database,
+    };
+    return this.request(request);
+  }
+
   protected request(request: Partial<Request<any>>): Promise<any> {
     const clientRequestId = randomId();
     request.clientRequestId = clientRequestId;
