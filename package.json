@@ -1,6 +1,6 @@
 {
   "name": "@diana-db/odm",
-  "version": "2.2.8",
+  "version": "2.2.9",
   "description": "ODM for DianaDB",
   "author": "Data Bikers Limited",
   "license": "MIT",

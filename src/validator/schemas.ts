@@ -337,6 +337,8 @@ const transformQueries = joi.array().items(
         .object()
         .pattern(/^/, joi.alternatives(projectionSchema, joi.string(), joi.boolean()))
         .min(1),
+      $skip: joi.number().positive().integer().allow(0),
+      $limit: joi.number().positive().integer(),
     })
     .max(1),
 );
