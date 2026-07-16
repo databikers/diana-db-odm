@@ -2,7 +2,7 @@ import { CONNECT_EVENT, DEFAULT_RECONNECT_TIMEOUT_VALUE } from '@const';
 import { DianaDbOptions } from '@options';
 import { eventEmitter } from '@event-emitter';
 import { Connection } from './connection';
-import { randomId } from '@helper';
+import { CryptoHelper, randomId } from '@helper';
 
 export class ConnectionManager {
   private options: DianaDbOptions;
