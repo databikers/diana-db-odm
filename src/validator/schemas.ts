@@ -20,10 +20,10 @@ const numberFieldExtended = joi.alternatives(
   joi.number(),
   pointer,
   joi.object({
-    $add: joi.number().positive(),
-    $subtract: joi.number().positive(),
-    $multiply: joi.number().positive(),
-    $divide: joi.number().positive(),
+    $add: joi.number(),
+    $subtract: joi.number(),
+    $multiply: joi.number(),
+    $divide: joi.number().disallow(0),
     $round: joi.number().positive().integer().min(0).max(8),
   }),
 );
@@ -71,7 +71,7 @@ const timeField = joi.alternatives(
     })
     .min(1),
 );
-const booleanField = joi.alternatives(joi.boolean().allow(true, false), pointer, joi.number().allow(0, 1));
+const booleanField = joi.alternatives(joi.boolean().allow(true, false), pointer);
 
 const geoField = joi.alternatives(
   joi.object({
@@ -270,7 +270,7 @@ const schemaItem = joi
   .oxor('lowercase', 'uppercase')
   .min(1);
 
-export const modelOptions = joi.object({
+const modelOptions = joi.object({
   database: joi.string().required(),
   collection: joi.string().required(),
   name: joi.string().required(),
@@ -279,33 +279,33 @@ export const modelOptions = joi.object({
 
 const projectionSchema = joi
   .object({
-    $sum: joi.array().items(joi.string(), joi.number(), joi.any()),
-    $subtract: joi.array().items(joi.string(), joi.number(), joi.any()),
-    $divide: joi.array().items(joi.string(), joi.number(), joi.any()),
-    $multiply: joi.array().items(joi.string(), joi.number(), joi.any()),
-    $ifNull: joi.array().items(joi.string(), joi.number(), joi.any()),
+    $sum: joi.array().items(joi.number(), pointer),
+    $subtract: joi.array().items(joi.number(), pointer),
+    $divide: joi.array().items(joi.number().disallow(0), pointer),
+    $multiply: joi.array().items(joi.number(), pointer),
+    $ifNull: joi.array().items(joi.number(), pointer),
     $max: pointer,
     $min: pointer,
     $avg: pointer,
     $push: joi.any(),
     $addToSet: joi.any(),
-    $concatArray: joi.string(),
-    $first: joi.string(),
-    $last: joi.string(),
+    $concatArray: pointer,
+    $first: pointer,
+    $last: pointer,
     $concat: joi.object({
       delimiter: joi.string().required(),
       parts: joi.array().items(joi.string()),
     }),
-    $year: joi.string(),
-    $month: joi.string(),
-    $date: joi.string(),
-    $hours: joi.string(),
-    $minutes: joi.string(),
-    $seconds: joi.string(),
-    $dayOfWeek: joi.string(),
-    $dayOfYear: joi.string(),
-    $timestamp: joi.string(),
-    $round: joi.number().positive().integer().allow(0),
+    $year: pointer,
+    $month: pointer,
+    $date: pointer,
+    $hours: pointer,
+    $minutes: pointer,
+    $seconds: pointer,
+    $dayOfWeek: pointer,
+    $dayOfYear: pointer,
+    $timestamp: pointer,
+    $round: joi.array().items(joi.string(), joi.number()).length(2).ordered(joi.string(), joi.number()),
   })
   .min(1)
   .max(1);
@@ -326,13 +326,13 @@ const transformQueries = joi.array().items(
       }),
       $match: joi.object().pattern(/^/, joi.alternatives(booleanQuery, stringQuery, numberQuery, timeQuery, geoQuery)),
       $sort: joi.object().pattern(/^/, joi.number().integer().allow(-1, 1)).min(1),
-      $unwind: joi.string(),
-      $replaceRoot: joi.string(),
+      $unwind: pointer,
+      $replaceRoot: pointer,
       $group: joi
         .object({
           _id: joi.any().required(),
         })
-        .pattern(/^(?!.*\_id$)/, joi.alternatives(projectionSchema, joi.string(), joi.boolean())),
+        .pattern(/^(?!.*\_id$)/, joi.alternatives(projectionSchema, pointer, joi.boolean())),
       $project: joi
         .object()
         .pattern(/^/, joi.alternatives(projectionSchema, joi.string(), joi.boolean()))
@@ -349,6 +349,7 @@ const sortQuery = joi.alternatives(
 );
 
 export {
+  modelOptions,
   numberFieldExtended,
   stringField,
   timeField,
