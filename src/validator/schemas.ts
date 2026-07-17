@@ -305,7 +305,7 @@ const projectionSchema = joi
     $dayOfWeek: pointer,
     $dayOfYear: pointer,
     $timestamp: pointer,
-    $round: joi.array().items(joi.string(), joi.number()).length(2).ordered(joi.string(), joi.number()),
+    $round: joi.number().positive().integer().min(0).max(8),
   })
   .min(1)
   .max(1);
