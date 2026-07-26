@@ -247,6 +247,8 @@ const schemaItem = joi
     required: joi.boolean(),
     unique: joi.boolean(),
     default: joi.any(),
+    set: joi.any(),
+    get: joi.any(),
     mutable: joi.boolean(),
     ttl: joi
       .when('type', {
@@ -268,6 +270,7 @@ const schemaItem = joi
       }),
   })
   .oxor('lowercase', 'uppercase')
+  .oxor('default', 'set', 'get')
   .min(1);
 
 const modelOptions = joi.object({

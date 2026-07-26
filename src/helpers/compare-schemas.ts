@@ -15,7 +15,13 @@ export function hasDifference<T>(schemaA: Schema<T>, schemaB: Schema<T>): boolea
       return true;
     }
     for (const prop of Object.keys(aField)) {
-      if (prop === 'default') {
+      if (
+        [
+          'default',
+          'get',
+          'set',
+        ].includes(prop)
+      ) {
         continue;
       }
       if (!(prop in bField) || aField[prop as keyof SchemaItem] !== bField[prop as keyof SchemaItem]) {
@@ -23,7 +29,13 @@ export function hasDifference<T>(schemaA: Schema<T>, schemaB: Schema<T>): boolea
       }
     }
     for (const prop of Object.keys(bField)) {
-      if ((prop as keyof SchemaItem) === 'default') {
+      if (
+        [
+          'default',
+          'get',
+          'set',
+        ].includes(prop)
+      ) {
         continue;
       }
       if (!(prop in aField) || bField[prop as keyof SchemaItem] !== aField[prop as keyof SchemaItem]) {

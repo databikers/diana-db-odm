@@ -44,12 +44,23 @@ export class Model<T> {
     if (!data || typeof data !== 'object') {
       throw ErrorFactory.schemaError(`document should be an object`, 'stored document');
     }
-    for (const key in this.options.schema as Schema<T>) {
-      if (data[key] === undefined && Object.prototype.hasOwnProperty.apply(this.options.schema[key], ['default'])) {
+    const keys = Object.keys(this.options.schema);
+    for (const key of keys) {
+      if (data[key] === undefined && this.options.schema[key].default !== undefined) {
         if (typeof this.options.schema[key].default === 'function') {
           data[key] = await this.options.schema[key].default.apply(data, []);
         } else {
           data[key] = this.options.schema[key].default;
+        }
+      }
+    }
+    for (const key in data) {
+      if (this.options.schema[key]?.set) {
+        if (typeof this.options.schema[key].set === 'function') {
+          const setValue = await this.options.schema[key].set.apply(data, [data[key]]);
+          if (setValue !== undefined && !Number.isNaN(setValue)) {
+            data[key] = setValue;
+          }
         }
       }
     }
@@ -211,7 +222,24 @@ export class Model<T> {
     if (transactionId) {
       request.transactionId = transactionId;
     }
-    return this.request(request);
+    const items: T[] = await this.request(request);
+    if (!transformQueries || !Array.isArray(transformQueries) || !transformQueries.length) {
+      for (const item of items) {
+        const keys: string[] = Object.keys(this.options.schema);
+        for (const key of keys) {
+          if (typeof this.options.schema[key].get === 'function') {
+            item[key as keyof T] = await this.options.schema[key].get.apply(item, []);
+          } else if (this.options.schema[key].default !== undefined && item[key as keyof T] === undefined) {
+            if (typeof this.options.schema[key].default === 'function') {
+              item[key as keyof T] = await this.options.schema[key].default.apply(item, []);
+            } else {
+              item[key as keyof T] = this.options.schema[key].default;
+            }
+          }
+        }
+      }
+    }
+    return items;
   }
 
   public async distinct(key: string): Promise<T[]> {
@@ -283,6 +311,16 @@ export class Model<T> {
     }
     this.validator.filterQueries(filterQueries);
     this.validator.mutableFields(updateData);
+    for (const key in updateData) {
+      if (this.options.schema[key]?.set) {
+        if (typeof this.options.schema[key].set === 'function') {
+          const setValue = await this.options.schema[key].set.apply(updateData, [updateData[key]]);
+          if (setValue !== undefined && !Number.isNaN(setValue)) {
+            updateData[key] = setValue;
+          }
+        }
+      }
+    }
     this.validator.data(updateData, true);
     const request: Partial<Request<T>> = {
       database: this.options.database,
