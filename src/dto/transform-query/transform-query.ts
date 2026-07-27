@@ -4,14 +4,14 @@ import { GroupQuery } from './group-query';
 import { LookupQuery } from './lookup-query';
 import { ProjectQuery } from './project-query';
 
-export type TransformQuery<T> = {
-  $match?: FindQuery<T>;
-  $group?: GroupQuery<T>;
-  $lookup?: LookupQuery<T>;
-  $project?: ProjectQuery<T>;
-  $unwind?: keyof T;
-  $replaceRoot?: keyof T;
-  $sort?: Sorting<T>;
+export type TransformQuery<L> = {
+  $match?: FindQuery<L>;
+  $group?: GroupQuery<L>;
+  $lookup?: LookupQuery<L, any>;
+  $project?: ProjectQuery<L>;
+  $unwind?: string;
+  $replaceRoot?: keyof L;
+  $sort?: Sorting<L>;
   $skip?: number;
   $limit?: number;
 };

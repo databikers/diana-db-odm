@@ -323,6 +323,7 @@ const transformQueries = joi.array().items(
         localField: joi.string().required(),
         foreignField: joi.string().required(),
         filter: joi.any(),
+        replaceRoot: pointer,
         sort: joi.object().pattern(/^/, joi.number().integer().allow(-1, 1)).min(1),
         skip: joi.number().positive().integer().allow(0),
         limit: joi.number().positive().integer(),
