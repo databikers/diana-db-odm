@@ -6,5 +6,5 @@ _Reimagining NoSQL with schema enforcement, columnar speed, and developer-first 
 
 ---
 
-Use DianaDb Server version >= 2.3.1
-Use ODM version >= 2.3.1
+Use DianaDb Server version >= 2.5.1
+Use ODM version >= 2.5.1
