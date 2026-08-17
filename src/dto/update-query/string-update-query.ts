@@ -1,4 +1,7 @@
 export type StringUpdateQuery = {
-  $concat: string;
+  $concat: {
+    delimiter: string;
+    parts: string[];
+  };
   $replace: string[];
 };
