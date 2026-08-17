@@ -268,19 +268,19 @@ const schemaItem = joi
         is: Types.TIME,
         then: joi.number().positive().integer().min(5),
       }),
-    triggerRemove: joi
-      .when('type', {
-        is: Types.REFERENCE,
-        then: joi.boolean(),
-      })
-      .when('items', {
-        is: Types.REFERENCE,
-        then: joi.boolean(),
-      })
-      .when('type', {
-        not: Types.REFERENCE,
-        then: joi.forbidden(),
+    triggerRemove: joi.when('type', {
+      is: Types.REFERENCE,
+      then: joi.boolean(),
+      otherwise: joi.any().when('type', {
+        is: Types.ARRAY,
+        then: joi.any().when('items', {
+          is: Types.REFERENCE,
+          then: joi.boolean(),
+          otherwise: joi.forbidden(),
+        }),
+        otherwise: joi.forbidden(),
       }),
+    }),
   })
   .oxor('lowercase', 'uppercase')
   .oxor('default', 'set', 'get')

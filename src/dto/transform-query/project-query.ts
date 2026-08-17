@@ -30,5 +30,4 @@ export type ProjectQueryItem = {
 };
 
 export type ProjectQuery<T> =
-  | Partial<Record<keyof T, T[keyof T] | ProjectQueryItem>>
-  | Record<string, ProjectQueryItem>;
+  Partial<Record<keyof T, T[keyof T] | ProjectQueryItem>> | Record<string, ProjectQueryItem>;
