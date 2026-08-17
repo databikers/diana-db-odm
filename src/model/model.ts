@@ -78,7 +78,10 @@ export class Model<T> {
     return this.request(request);
   }
 
-  public async createView(name: string, transformQueries?: TransformQuery<T>[]) {
+  public async createView(
+    name: string,
+    transformQueries?: TransformQuery<T>[],
+  ): Promise<{ view: string; action: string }> {
     if (!this.initialized) {
       await this.init();
     }
@@ -98,7 +101,7 @@ export class Model<T> {
     return this.request(request);
   }
 
-  public async removeView(name: string) {
+  public async removeView(name: string): Promise<{ view: string; action: string }> {
     if (!this.initialized) {
       await this.init();
     }
@@ -121,7 +124,7 @@ export class Model<T> {
     sorting?: Sorting<any>,
     skip?: number,
     limit?: number,
-  ) {
+  ): Promise<any[]> {
     if (!this.initialized) {
       await this.init();
     }
@@ -156,7 +159,7 @@ export class Model<T> {
     return this.request(request);
   }
 
-  public async countByView(view: string, findQuery?: FindQuery<T>) {
+  public async countByView(view: string, findQuery?: FindQuery<T>): Promise<number> {
     if (!this.initialized) {
       await this.init();
     }
@@ -242,7 +245,7 @@ export class Model<T> {
     return items;
   }
 
-  public async distinct(key: string): Promise<T[]> {
+  public async distinct(key: keyof T): Promise<any[]> {
     if (!this.initialized) {
       await this.init();
     }
@@ -255,7 +258,7 @@ export class Model<T> {
     return this.request(request);
   }
 
-  public async max(key: string): Promise<T[]> {
+  public async max(key: keyof T): Promise<T[]> {
     if (!this.initialized) {
       await this.init();
     }
@@ -268,7 +271,7 @@ export class Model<T> {
     return this.request(request);
   }
 
-  public async min(key: string): Promise<T[]> {
+  public async min(key: keyof T): Promise<T[]> {
     if (!this.initialized) {
       await this.init();
     }
@@ -281,7 +284,11 @@ export class Model<T> {
     return this.request(request);
   }
 
-  public async count(filterQueries: FindQuery<T>[], transformQueries?: TransformQuery<T>[], transactionId?: string) {
+  public async count(
+    filterQueries: FindQuery<T>[],
+    transformQueries?: TransformQuery<T>[],
+    transactionId?: string,
+  ): Promise<number> {
     if (!this.initialized) {
       await this.init();
     }
