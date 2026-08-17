@@ -245,7 +245,7 @@ export class Model<T> {
     return items;
   }
 
-  public async distinct(key: keyof T): Promise<any[]> {
+  public async distinct(key: keyof T | string): Promise<any[]> {
     if (!this.initialized) {
       await this.init();
     }
@@ -253,12 +253,12 @@ export class Model<T> {
       database: this.options.database,
       collection: this.options.collection,
       action: ClientAction.DISTINCT,
-      distinctKey: key,
+      distinctKey: key as string,
     };
     return this.request(request);
   }
 
-  public async max(key: keyof T): Promise<T[]> {
+  public async max(key: keyof T | string): Promise<T[]> {
     if (!this.initialized) {
       await this.init();
     }
@@ -266,7 +266,7 @@ export class Model<T> {
       database: this.options.database,
       collection: this.options.collection,
       action: ClientAction.MAX,
-      distinctKey: key,
+      distinctKey: key as string,
     };
     return this.request(request);
   }
@@ -279,7 +279,7 @@ export class Model<T> {
       database: this.options.database,
       collection: this.options.collection,
       action: ClientAction.MIN,
-      distinctKey: key,
+      distinctKey: key as string,
     };
     return this.request(request);
   }

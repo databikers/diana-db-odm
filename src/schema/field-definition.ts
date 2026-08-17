@@ -10,6 +10,6 @@ export type FieldDefinition<T> = {
   unique?: true;
   mutable?: boolean;
   default?: T | DefaultSetter<T> | DefaultAsyncSetter<T>;
-  get?: T | Promise<T>;
-  set?: (value: T) => void;
+  get?: () => T | Promise<T>;
+  set?: (...args: any[]) => void | Promise<void>;
 };
