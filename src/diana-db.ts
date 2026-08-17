@@ -233,7 +233,7 @@ export class DianaDb {
     return this.request(request);
   }
 
-  public async subscribe(key: string, subscriber: (DatabaseUpdate: DatabaseUpdate) => void): Promise<void> {
+  public async subscribe(key: string, subscriber: (databaseUpdate: DatabaseUpdate) => void): Promise<void> {
     if (!this.subscribersConnection) {
       this.subscribersConnection = new Connection({
         host: this.options.host,
@@ -263,7 +263,7 @@ export class DianaDb {
     return this.request(request);
   }
 
-  public removeCollection<T>(database: string, collection: string): Promise<{ schema: Schema<T>; locked: boolean }> {
+  public removeCollection<T>(database: string, collection: string): Promise<{ schema: Schema<T>; action: string }> {
     const request: Partial<Request<any>> = {
       action: ClientAction.REMOVE_COLLECTION,
       database,
@@ -272,7 +272,7 @@ export class DianaDb {
     return this.request(request);
   }
 
-  public removeDatabase(database: string): Promise<{ database: string; actions: string }> {
+  public removeDatabase(database: string): Promise<{ database: string; action: string }> {
     const request: Partial<Request<any>> = {
       action: ClientAction.REMOVE_DATABASE,
       database,
@@ -280,7 +280,7 @@ export class DianaDb {
     return this.request(request);
   }
 
-  public createDatabase(database: string): Promise<{ database: string; actions: string }> {
+  public createDatabase(database: string): Promise<{ database: string; action: string }> {
     const request: Partial<Request<any>> = {
       action: ClientAction.CREATE_DATABASE,
       database,
