@@ -16,6 +16,8 @@ export enum ClientAction {
   MIGRATE_DOWN = 'migrateDown',
   GET_MIGRATIONS = 'getMigrations',
   ADD_COLLECTION = 'addCollection',
+  /** Alias of ADD_COLLECTION on the server. */
+  CREATE_COLLECTION = 'createCollection',
   ADD_VIEW = 'addView',
   REMOVE_VIEW = 'removeView',
   REMOVE_COLLECTION = 'removeCollection',
@@ -30,8 +32,11 @@ export enum ClientAction {
   GET_HEALTH = 'getHealth',
   CREATE_DATABASE = 'createDatabase',
   REMOVE_DATABASE = 'removeDatabase',
+  /** @deprecated Not handled by the server: users are managed with the `diana-db add-user` CLI. */
   ADD_USER = 'addUser',
+  /** @deprecated Not handled by the server: users are managed with the `diana-db remove-user` CLI. */
   REMOVE_USER = 'removeUser',
+  /** @deprecated Not handled by the server: access is granted with the `diana-db grant-access` CLI. */
   GRANT_ACCESS = 'grantAccess',
   GET_VERSION = 'getVersion',
 }

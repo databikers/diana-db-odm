@@ -1,4 +1,4 @@
-import { DianaDbOptions } from './diana-db-options';
+import { DianaDbOptions, TlsOptions } from './diana-db-options';
 import { ConnectionManager } from '@connection';
 
 export type ConnectOptions = Pick<DianaDbOptions, 'user' | 'password' | 'host' | 'port' | 'logger'> & {
@@ -7,10 +7,5 @@ export type ConnectOptions = Pick<DianaDbOptions, 'user' | 'password' | 'host' |
   connectionManager?: ConnectionManager;
   isSubscriber?: boolean;
   secureServer?: boolean;
-  tls?: {
-    cert: Buffer;
-    key: Buffer;
-    ca?: Buffer;
-    rejectUnauthorized?: boolean;
-  };
+  tls?: TlsOptions;
 };

@@ -1,10 +1,5 @@
 import { EventEmitter } from 'events';
-import * as console from 'console';
-import { CONNECT_EVENT } from '@const';
-import { Model } from '@model';
 
+// Carries per-request "<clientRequestId>:response|error" events. Every key is unique, so instances can share it.
 export const eventEmitter = new EventEmitter();
-
-eventEmitter.once(CONNECT_EVENT, () => {
-  Model.init().catch(console.error);
-});
+eventEmitter.setMaxListeners(0);

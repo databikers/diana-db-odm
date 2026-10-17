@@ -1,18 +1,20 @@
-import { ClientAction, DEFAULT_REQUEST_TIMEOUT_VALUE, INITIALIZE_EVENT, Types } from '@const';
+import { ClientAction, INITIALIZE_EVENT, Types } from '@const';
 import { ModelOptions, ValidatorOptions } from '@options';
 import { FindQuery, Request, Sorting, UpdateData, TransformQuery } from '@dto';
 import { Validator } from '@validate';
 import { eventEmitter } from '@event-emitter';
-import { ServerResponse } from '@parameters';
 import { Schema } from '@schema';
-import { eventKeyHelper, compareSchemas, randomId } from '@helper';
+import { compareSchemas } from '@helper';
 import { ErrorFactory } from '@error';
 import { ProcessController } from '@controller';
 
 export class Model<T> {
   private static instances: Model<any>[] = [];
   private initialized: boolean;
+  private initializing: Promise<void>;
   private _locked: boolean;
+  // The client fixed when the model was constructed, so creating another DianaDb later doesn't re-route it.
+  private boundController: ProcessController;
 
   protected options: ModelOptions<T>;
   protected validator: Validator<T>;
@@ -28,22 +30,30 @@ export class Model<T> {
     this.options.schema._id = {
       type: Types.OBJECT_ID,
     };
+    this.boundController = options.dianaDb?.controller || ProcessController.instance;
     Model.instances = Model.instances || [];
     Model.instances.push(this);
   }
 
+  /** Initializes every constructed model. */
   public static async init() {
-    await Promise.all(Model.instances.map((model: Model<any>) => model.init));
+    await Promise.all(Model.instances.map((model: Model<any>) => model.init()));
     eventEmitter.emit(INITIALIZE_EVENT);
   }
 
-  public async insert(data: any, transactionId?: string): Promise<T & { _id: string }> {
+  private async ensureInitialized(): Promise<void> {
     if (!this.initialized) {
       await this.init();
     }
-    if (!data || typeof data !== 'object') {
+  }
+
+  public async insert(data: any, transactionId?: string): Promise<T & { _id: string }> {
+    await this.ensureInitialized();
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw ErrorFactory.schemaError(`document should be an object`, 'stored document');
     }
+    // Defaults and setters are applied to a copy: the caller's object is left as it was.
+    data = { ...data };
     const keys = Object.keys(this.options.schema);
     for (const key of keys) {
       if (data[key] === undefined && this.options.schema[key].default !== undefined) {
@@ -82,9 +92,7 @@ export class Model<T> {
     name: string,
     transformQueries?: TransformQuery<T>[],
   ): Promise<{ view: string; action: string }> {
-    if (!this.initialized) {
-      await this.init();
-    }
+    await this.ensureInitialized();
     if (!name || typeof name !== 'string') {
       throw ErrorFactory.argumentError(`View name should be a string`);
     }
@@ -102,9 +110,7 @@ export class Model<T> {
   }
 
   public async removeView(name: string): Promise<{ view: string; action: string }> {
-    if (!this.initialized) {
-      await this.init();
-    }
+    await this.ensureInitialized();
     if (!name || typeof name !== 'string') {
       throw ErrorFactory.argumentError(`View name should be a string`);
     }
@@ -125,9 +131,7 @@ export class Model<T> {
     skip?: number,
     limit?: number,
   ): Promise<any[]> {
-    if (!this.initialized) {
-      await this.init();
-    }
+    await this.ensureInitialized();
     if (!view || typeof view !== 'string') {
       throw ErrorFactory.argumentError(`View name should be a string`);
     }
@@ -160,9 +164,7 @@ export class Model<T> {
   }
 
   public async countByView(view: string, findQuery?: FindQuery<T>): Promise<number> {
-    if (!this.initialized) {
-      await this.init();
-    }
+    await this.ensureInitialized();
     if (!view || typeof view !== 'string') {
       throw ErrorFactory.argumentError(`View name should be a string`);
     }
@@ -183,29 +185,22 @@ export class Model<T> {
   }
 
   public async find(
-    filterQueries: FindQuery<T>[],
+    filterQueries: FindQuery<T>[] | FindQuery<T> = [{}],
     transformQueries?: TransformQuery<T>[],
     sorting?: Sorting<T>,
     skip?: number,
     limit?: number,
     transactionId?: string,
   ): Promise<T[]> {
-    if (!this.initialized) {
-      await this.init();
-    }
-    if (!Array.isArray(filterQueries)) {
-      filterQueries = [filterQueries];
-    }
-    this.validator.filterQueries(filterQueries);
+    await this.ensureInitialized();
+    const filters: FindQuery<T>[] = this.toFilters(filterQueries);
+    this.validator.filterQueries(filters);
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
       action: ClientAction.FIND,
     };
-    if (!filterQueries) {
-      filterQueries = [];
-    }
-    request.filterQueries = Array.isArray(filterQueries) ? filterQueries : [filterQueries];
+    request.filterQueries = filters;
     if (transformQueries) {
       this.validator.transformQueries(transformQueries);
       request.transformQueries = transformQueries;
@@ -225,7 +220,7 @@ export class Model<T> {
     if (transactionId) {
       request.transactionId = transactionId;
     }
-    const items: T[] = await this.request(request);
+    const items: T[] = (await this.request(request)) || [];
     if (!transformQueries || !Array.isArray(transformQueries) || !transformQueries.length) {
       for (const item of items) {
         const keys: string[] = Object.keys(this.options.schema);
@@ -246,9 +241,7 @@ export class Model<T> {
   }
 
   public async distinct(key: keyof T | string): Promise<any[]> {
-    if (!this.initialized) {
-      await this.init();
-    }
+    await this.ensureInitialized();
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
@@ -259,9 +252,7 @@ export class Model<T> {
   }
 
   public async max(key: keyof T | string): Promise<T[]> {
-    if (!this.initialized) {
-      await this.init();
-    }
+    await this.ensureInitialized();
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
@@ -271,10 +262,8 @@ export class Model<T> {
     return this.request(request);
   }
 
-  public async min(key: keyof T): Promise<T[]> {
-    if (!this.initialized) {
-      await this.init();
-    }
+  public async min(key: keyof T | string): Promise<T[]> {
+    await this.ensureInitialized();
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
@@ -285,20 +274,19 @@ export class Model<T> {
   }
 
   public async count(
-    filterQueries: FindQuery<T>[],
+    filterQueries: FindQuery<T>[] | FindQuery<T> = [{}],
     transformQueries?: TransformQuery<T>[],
     transactionId?: string,
   ): Promise<number> {
-    if (!this.initialized) {
-      await this.init();
-    }
+    await this.ensureInitialized();
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
       action: ClientAction.COUNT,
     };
-    this.validator.filterQueries(filterQueries);
-    request.filterQueries = filterQueries;
+    const filters: FindQuery<T>[] = this.toFilters(filterQueries);
+    this.validator.filterQueries(filters);
+    request.filterQueries = filters;
     if (transformQueries && transformQueries.length) {
       this.validator.transformQueries(transformQueries);
       request.transformQueries = transformQueries;
@@ -309,14 +297,19 @@ export class Model<T> {
     return this.request(request);
   }
 
-  public async update(filterQueries: FindQuery<T>[], updateData: UpdateData<T>, transactionId?: string): Promise<any> {
-    if (!this.initialized) {
-      await this.init();
+  public async update(
+    filterQueries: FindQuery<T>[] | FindQuery<T>,
+    updateData: UpdateData<T>,
+    transactionId?: string,
+  ): Promise<{ found: number; modified: number }> {
+    await this.ensureInitialized();
+    if (!updateData || typeof updateData !== 'object') {
+      throw ErrorFactory.argumentError(`updateData should be an object`);
     }
-    if (!Array.isArray(filterQueries)) {
-      filterQueries = [filterQueries];
-    }
-    this.validator.filterQueries(filterQueries);
+    const filters: FindQuery<T>[] = this.toFilters(filterQueries);
+    this.validator.filterQueries(filters);
+    // Setters are applied to a copy: the caller's object is left as it was.
+    updateData = { ...updateData };
     this.validator.mutableFields(updateData);
     for (const key in updateData) {
       if (this.options.schema[key]?.set) {
@@ -334,7 +327,7 @@ export class Model<T> {
       collection: this.options.collection,
       action: ClientAction.UPDATE,
     };
-    request.filterQueries = filterQueries;
+    request.filterQueries = filters;
     request.setData = updateData;
     if (transactionId) {
       request.transactionId = transactionId;
@@ -342,14 +335,13 @@ export class Model<T> {
     return this.request(request);
   }
 
-  public async remove(filterQueries: FindQuery<T>[], transactionId?: string): Promise<any> {
-    if (!this.initialized) {
-      await this.init();
-    }
-    if (!Array.isArray(filterQueries)) {
-      filterQueries = [filterQueries];
-    }
-    this.validator.filterQueries(filterQueries);
+  public async remove(
+    filterQueries: FindQuery<T>[] | FindQuery<T>,
+    transactionId?: string,
+  ): Promise<{ found: number; removed: number }> {
+    await this.ensureInitialized();
+    const filters: FindQuery<T>[] = this.toFilters(filterQueries);
+    this.validator.filterQueries(filters);
     const request: Partial<Request<T>> = {
       database: this.options.database,
       collection: this.options.collection,
@@ -358,47 +350,74 @@ export class Model<T> {
     if (transactionId) {
       request.transactionId = transactionId;
     }
-    request.filterQueries = filterQueries;
+    request.filterQueries = filters;
     return this.request(request);
   }
 
-  protected request(request: Partial<Request<T>>): Promise<any> {
-    const clientRequestId = randomId();
-    const { action } = request;
-    request.clientRequestId = clientRequestId;
-    if (!request.timeoutValue) {
-      request.timeoutValue = DEFAULT_REQUEST_TIMEOUT_VALUE;
+  private toFilters(filterQueries: FindQuery<T>[] | FindQuery<T>): FindQuery<T>[] {
+    if (filterQueries === undefined || filterQueries === null) {
+      return [{}];
     }
-    const responseKey = eventKeyHelper(clientRequestId, 'response');
-    const errorKey = eventKeyHelper(clientRequestId, 'error');
-    return new Promise((resolve, reject) => {
-      eventEmitter.addListener(responseKey, (response: ServerResponse<T>) => {
-        eventEmitter.removeAllListeners(responseKey);
-        eventEmitter.removeAllListeners(errorKey);
-        const { data, found, modified, removed } = response;
-        switch (action) {
-          case ClientAction.UPDATE:
-            return resolve({ found, modified });
-          case ClientAction.REMOVE:
-            return resolve({ found, removed });
-          default:
-            return resolve(data as any);
-        }
-      });
-      eventEmitter.addListener(errorKey, (error: string) => {
-        eventEmitter.removeAllListeners(responseKey);
-        eventEmitter.removeAllListeners(errorKey);
-        return reject(new Error(error));
-      });
-      ProcessController.instance?.processRequest(request as Request<T>).catch(reject);
-    });
+    const filters: FindQuery<T>[] = Array.isArray(filterQueries) ? filterQueries : [filterQueries];
+    return filters.length ? filters : [{}];
   }
 
-  public async init(): Promise<void> {
-    this.initialized = true;
+  /**
+   * The client this model talks through: `options.dianaDb`, else the DianaDb most recently constructed before
+   * this model (or, for a model constructed before any client, the latest one at the time of the request).
+   */
+  protected get controller(): ProcessController {
+    const controller: ProcessController = this.boundController || ProcessController.instance;
+    if (!controller) {
+      throw ErrorFactory.configurationError(
+        `model ${this.options.name}: construct a DianaDb (or pass "dianaDb" in the model options) first`,
+      );
+    }
+    return controller;
+  }
+
+  protected async request(request: Partial<Request<T>>): Promise<any> {
+    const { action } = request;
+    const response = await this.controller.request<T>(request);
+    const { data, found, modified, removed } = response;
+    switch (action) {
+      case ClientAction.UPDATE:
+        return { found, modified };
+      case ClientAction.REMOVE:
+        return { found, removed };
+      default:
+        return data as any;
+    }
+  }
+
+  /**
+   * Creates the collection, or reconciles its schema with the server. Safe to call concurrently: every caller
+   * shares one attempt, and a failed attempt can be retried.
+   */
+  public init(): Promise<void> {
+    if (this.initialized) {
+      return Promise.resolve();
+    }
+    if (!this.initializing) {
+      this.initializing = this.reconcile().then(
+        () => {
+          this.initialized = true;
+          this.initializing = undefined;
+        },
+        (error: Error) => {
+          this.initializing = undefined;
+          throw error;
+        },
+      );
+    }
+    return this.initializing;
+  }
+
+  protected async reconcile(): Promise<void> {
     const collectionExists: boolean = await this.checkCollectionExistence();
     if (collectionExists) {
       const { schema, locked } = await this.getRemoteSchema();
+      this._locked = locked;
       const isDifferent: boolean = this.compareSchemas(schema);
       if (isDifferent) {
         if (locked) {
@@ -406,11 +425,11 @@ export class Model<T> {
             `Schema mismatch: collection ${this.options.collection} is locked on the remote server, and its schema differs from the local one`,
           );
         } else {
-          return this.updateSchema();
+          await this.updateSchema();
         }
       }
     } else {
-      return this.createCollection();
+      await this.createCollection();
     }
   }
 

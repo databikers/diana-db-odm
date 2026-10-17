@@ -6,6 +6,6 @@ export type TimeUpdateQuery = {
   $subtract: UpdateTimeHolderItem;
   $toStartOf: UnitOfTime;
   $toEndOf: UnitOfTime;
-  $toNextWeekDay: Weekday;
-  $toLastWeekDay: Weekday;
+  $toNextWeekday: Weekday;
+  $toLastWeekday: Weekday;
 };

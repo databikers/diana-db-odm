@@ -4,23 +4,30 @@ const joi = require('joi');
 
 const pointer = joi.string().regex(/^\$[A-Za-z]+[A-Za-z0-9_]+/);
 
+const pemInput = joi.alternatives(joi.string(), joi.binary());
+
 export const clientOptions = joi.object({
-  port: joi.number().positive().integer().min(1025).max(65535).required(),
+  port: joi.number().positive().integer().min(1025).max(65535),
   host: joi.string().required(),
   user: joi.string().required(),
   password: joi.string().required(),
   connectionPoolSize: joi.number().positive().integer().min(1),
   connectTimeoutValue: joi.number().positive().integer().allow(0),
   reconnectTimeoutValue: joi.number().positive().integer().allow(0),
+  requestTimeoutValue: joi.number().positive().integer().min(1),
+  database: joi.string(),
   secureServer: joi.boolean(),
   logger: joi.any(),
+  // Buffers, as in the README (readFileSync), or PEM strings. Other node tls options pass through.
   tls: joi
     .object({
-      cert: joi.string().required(),
-      key: joi.string().required(),
-      ca: joi.string(),
+      cert: pemInput,
+      key: pemInput,
+      ca: joi.alternatives(pemInput, joi.array().items(pemInput)),
       rejectUnauthorized: joi.boolean(),
+      servername: joi.string(),
     })
+    .unknown(true)
     .optional(),
 });
 
@@ -32,7 +39,7 @@ const numberFieldExtended = joi.alternatives(
     $subtract: joi.number(),
     $multiply: joi.number(),
     $divide: joi.number().disallow(0),
-    $round: joi.number().positive().integer().min(0).max(8),
+    $round: joi.number().integer().min(0).max(8),
   }),
 );
 
@@ -74,8 +81,8 @@ const timeField = joi.alternatives(
       $subtract: timeFieldItem,
       $toStartOf: unitOfTime,
       $toEndOf: unitOfTime,
-      $toNextWeekDay: weekday,
-      $toLastWeekDay: weekday,
+      $toNextWeekday: weekday,
+      $toLastWeekday: weekday,
     })
     .min(1),
 );
@@ -238,7 +245,7 @@ const schemaItem = joi
     precision: joi
       .when('type', {
         is: Types.NUMBER,
-        then: joi.number().positive().integer().allow(0).min(0).max(8).required(),
+        then: joi.number().integer().min(0).max(8),
       })
       .when('type', {
         not: Types.NUMBER,
@@ -291,6 +298,7 @@ const modelOptions = joi.object({
   collection: joi.string().required(),
   name: joi.string().required(),
   schema: joi.object().pattern(/^/, schemaItem).min(1),
+  dianaDb: joi.object(),
 });
 
 const projectionSchema = joi
@@ -321,7 +329,7 @@ const projectionSchema = joi
     $dayOfWeek: pointer,
     $dayOfYear: pointer,
     $timestamp: pointer,
-    $round: joi.number().positive().integer().min(0).max(8),
+    $round: joi.number().integer().min(0).max(8),
   })
   .min(1)
   .max(1);

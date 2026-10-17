@@ -1,15 +1,15 @@
 import {
   ClientAction,
-  CONNECT_EVENT,
+  MigrationStatus,
   DEFAULT_CONNECT_TIMEOUT_VALUE,
+  DEFAULT_CONNECTION_PULL_SIZE,
+  DEFAULT_RECONNECT_TIMEOUT_VALUE,
   DEFAULT_REQUEST_TIMEOUT_VALUE,
-  INITIALIZE_EVENT,
-  ServerAction,
+  DEFAULT_SERVER_PORT,
 } from '@const';
-import { Request, TransactionInfo, Migration, TransformQuery } from '@dto';
-import { DatabaseUpdate, ManageTransactionParameters, ServerResponse, StartTransactionParameters } from '@parameters';
-import { eventEmitter } from '@event-emitter';
-import { eventKeyHelper, parseConnectionString, randomId } from '@helper';
+import { Request, TransactionInfo, Migration, MigrationInfo, TransformQuery } from '@dto';
+import { DatabaseUpdate, ManageTransactionParameters, StartTransactionParameters } from '@parameters';
+import { parseConnectionString } from '@helper';
 import { DianaDbOptions } from '@options';
 import { Connection, ConnectionManager } from '@connection';
 import { ProcessController } from '@controller';
@@ -17,16 +17,16 @@ import { Validator } from '@validate';
 import { ErrorFactory } from '@error';
 import { Schema } from '@schema';
 
-let connectTimeout: any;
-let isInitialized: boolean = false;
+export type Subscriber = (databaseUpdate: DatabaseUpdate) => void;
 
 export class DianaDb {
   private readonly options: DianaDbOptions;
   private readonly connectionManager: ConnectionManager;
   public readonly controller: ProcessController;
   private migrations: Map<number, Migration>;
-  private subscribers: Map<string, (DatabaseUpdate: DatabaseUpdate) => void>;
+  private subscribers: Map<string, Set<Subscriber>>;
   private subscribersConnection: Connection;
+  private subscribersConnecting: Promise<void>;
 
   constructor(options: DianaDbOptions | string) {
     if (typeof options === 'string') {
@@ -36,56 +36,62 @@ export class DianaDb {
       options = parseConnectionString(options);
     }
     Validator.clientOptions(options);
-    this.options = options;
-    if (!this.options.logger) {
-      this.options.logger = console;
-    }
+    this.options = {
+      ...options,
+      port: options.port || DEFAULT_SERVER_PORT,
+      connectionPoolSize: options.connectionPoolSize || DEFAULT_CONNECTION_PULL_SIZE,
+      reconnectTimeoutValue: options.reconnectTimeoutValue || DEFAULT_RECONNECT_TIMEOUT_VALUE,
+      requestTimeoutValue: options.requestTimeoutValue || DEFAULT_REQUEST_TIMEOUT_VALUE,
+      logger: options.logger || console,
+    };
     this.migrations = new Map<number, Migration>();
-    this.subscribers = new Map<string, (data: any) => any>();
+    this.subscribers = new Map<string, Set<Subscriber>>();
     this.connectionManager = new ConnectionManager({ ...this.options, dianaDb: this });
-    this.controller = new ProcessController(this.connectionManager);
-    eventEmitter.on(ServerAction.PUBLISH, (DatabaseUpdate: DatabaseUpdate) => this.onPublish(DatabaseUpdate));
+    this.controller = new ProcessController(this.connectionManager, this.options.requestTimeoutValue);
+    this.controller.onPublish = (databaseUpdate: DatabaseUpdate) => this.onPublish(databaseUpdate);
   }
 
-  private onPublish(DatabaseUpdate: DatabaseUpdate) {
-    const { database, collection } = DatabaseUpdate.data;
-    const keyDC = `${database}.${collection}`;
-    const keyD = `${database}`;
-    if (this.subscribers.has(keyD)) {
-      this.subscribers.get(keyD)(DatabaseUpdate);
+  private onPublish(databaseUpdate: DatabaseUpdate) {
+    if (!databaseUpdate) {
+      return;
     }
-    if (this.subscribers.has(keyDC)) {
-      this.subscribers.get(keyDC)(DatabaseUpdate);
-    }
-  }
-
-  public async connect(connectTimeoutValue: number): Promise<boolean> {
-    return new Promise<boolean>((resolve, reject) => {
-      clearTimeout(connectTimeout);
-      connectTimeout = setTimeout(() => {
-        eventEmitter.removeAllListeners(INITIALIZE_EVENT);
-        reject(`Connection to the DianaDb Server ${this.options.host}:${this.options.port} was rejected by timeout.`);
-      }, connectTimeoutValue);
-      eventEmitter.on(INITIALIZE_EVENT, () => {
-        isInitialized = true;
-        clearTimeout(connectTimeout);
-        eventEmitter.removeAllListeners(INITIALIZE_EVENT);
-        this.options.logger.log(`DianaDB ODM is ready`);
-        resolve(true);
-      });
-      eventEmitter.on(CONNECT_EVENT, () => {
-        if (isInitialized) {
-          clearTimeout(connectTimeout);
-          eventEmitter.removeAllListeners(CONNECT_EVENT);
-          resolve(true);
+    const { database, collection } = databaseUpdate;
+    for (const key of [
+      database,
+      `${database}.${collection}`,
+    ]) {
+      for (const subscriber of this.subscribers.get(key) || []) {
+        try {
+          subscriber(databaseUpdate);
+        } catch (error) {
+          // One failing subscriber must not stop the others or the connection.
+          this.options.logger.error(error);
         }
-      });
-      this.connectionManager.connect(this.options.connectTimeoutValue || DEFAULT_CONNECT_TIMEOUT_VALUE).catch(reject);
-    });
+      }
+    }
   }
 
-  public disconnect(): Promise<void> {
-    return this.connectionManager.disconnect();
+  /** Resolves once the first pooled connection is up. Rejects with a CONNECTION error after the timeout. */
+  public async connect(connectTimeoutValue?: number): Promise<boolean> {
+    const timeout: number = connectTimeoutValue || this.options.connectTimeoutValue || DEFAULT_CONNECT_TIMEOUT_VALUE;
+    await this.connectionManager.connect(timeout);
+    if (this.subscribers.size) {
+      // Reconnecting after disconnect(): restore the subscriptions as well.
+      await this.ensureSubscribersConnection();
+    }
+    this.options.logger.log(`DianaDB ODM is ready`);
+    return true;
+  }
+
+  /** Closes every connection, the subscriber connection included. Pending requests fail at once. */
+  public async disconnect(): Promise<void> {
+    const subscribersConnection: Connection = this.subscribersConnection;
+    this.subscribersConnection = undefined;
+    this.subscribersConnecting = undefined;
+    await Promise.all([
+      this.connectionManager.disconnect(),
+      subscribersConnection?.disconnect(),
+    ]);
   }
 
   public addMigration(migration: Migration): void {
@@ -93,160 +99,221 @@ export class DianaDb {
     if (this.migrations.has(key)) {
       throw ErrorFactory.migrationError(`Index should be unique, index ${key} is used already.`);
     }
+    if (Array.from(this.migrations.values()).some((item: Migration) => item.name === migration.name)) {
+      throw ErrorFactory.migrationError(`Name should be unique, name ${migration.name} is used already.`);
+    }
     this.migrations.set(key, migration);
   }
 
-  public async migrateUp(): Promise<void> {
-    const request: Request<any> = {
-      action: ClientAction.GET_MIGRATIONS,
-    };
-    const remoteMigrations: string[] = await this.request(request);
+  /**
+   * Runs every migration not applied yet, in ascending index order. Resolves with the server's record of each
+   * one it ran (`{ name, status: 'up' }`).
+   * The server keeps one global list of applied migrations but checks WRITE access on a database, so
+   * a database is required: pass it here or set the `database` option.
+   */
+  public async migrateUp(database?: string): Promise<MigrationInfo[]> {
+    const db: string = this.migrationDatabase(database);
+    const remoteMigrations: string[] = await this.request({ action: ClientAction.GET_MIGRATIONS, database: db });
     const ownMigrations = Array.from(this.migrations.values()).sort((a, b) => a.index - b.index);
-    for (let i = 0; i < ownMigrations.length; i++) {
-      const migration: Migration = ownMigrations[i];
+    const applied: MigrationInfo[] = [];
+    for (const migration of ownMigrations) {
       if (!remoteMigrations.includes(migration.name)) {
         await migration.up();
-        await this.request({
-          migration: migration.name,
-          action: ClientAction.MIGRATE_UP,
-        });
+        applied.push(await this.markMigration(migration.name, ClientAction.MIGRATE_UP, db));
       }
     }
+    return applied;
   }
 
-  public async migrateDown(): Promise<void> {
-    const request: Request<any> = {
-      action: ClientAction.GET_MIGRATIONS,
-    };
-    const remoteMigrations: string[] = await this.request(request);
-    const ownMigrations = Array.from(this.migrations.values()).sort((a, b) => a.index - b.index);
-    for (let i = 0; i < ownMigrations.length; i++) {
-      const migration: Migration = ownMigrations[i];
-      if (remoteMigrations.includes(migration.name)) {
-        await migration.down();
-        await this.request({
-          migration: migration.name,
-          action: ClientAction.MIGRATE_DOWN,
-        });
-      }
+  /**
+   * Reverts applied migrations in descending index order: all of them, or only the last `steps`.
+   * Resolves with the server's record of each one it reverted (`{ name, status: 'down' }`).
+   */
+  public async migrateDown(database?: string, steps?: number): Promise<MigrationInfo[]> {
+    const db: string = this.migrationDatabase(database);
+    const remoteMigrations: string[] = await this.request({ action: ClientAction.GET_MIGRATIONS, database: db });
+    const ownMigrations = Array.from(this.migrations.values())
+      .filter((migration: Migration) => remoteMigrations.includes(migration.name))
+      .sort((a, b) => b.index - a.index);
+    const toRevert: Migration[] = steps === undefined ? ownMigrations : ownMigrations.slice(0, Math.max(0, steps));
+    const reverted: MigrationInfo[] = [];
+    for (const migration of toRevert) {
+      await migration.down();
+      reverted.push(await this.markMigration(migration.name, ClientAction.MIGRATE_DOWN, db));
     }
+    return reverted;
+  }
+
+  /**
+   * Records a migration as up/down on the server and checks the answer, `{ migration: { name, status } }`.
+   * Throws if the server did not confirm it, so a migration whose code ran but which was not recorded is not
+   * silently treated as applied (it would run again on the next migrateUp).
+   */
+  private async markMigration(
+    name: string,
+    action: ClientAction.MIGRATE_UP | ClientAction.MIGRATE_DOWN,
+    database: string,
+  ): Promise<MigrationInfo> {
+    const expected: MigrationStatus = action === ClientAction.MIGRATE_UP ? MigrationStatus.UP : MigrationStatus.DOWN;
+    const data: { migration?: MigrationInfo } = await this.request({ migration: name, action, database });
+    const info: MigrationInfo = data?.migration;
+    if (!info || info.name !== name || info.status !== expected) {
+      throw ErrorFactory.migrationError(
+        `the server did not confirm "${name}" as ${expected} (answer: ${JSON.stringify(data)}); ` +
+          `its ${expected === MigrationStatus.UP ? 'up()' : 'down()'} has already run`,
+      );
+    }
+    return info;
+  }
+
+  /** Names of the migrations the server has recorded as applied. */
+  public getMigrations(database?: string): Promise<string[]> {
+    return this.request({ action: ClientAction.GET_MIGRATIONS, database: this.migrationDatabase(database) });
+  }
+
+  private migrationDatabase(database?: string): string {
+    const db: string = database || this.options.database;
+    if (!db) {
+      throw ErrorFactory.migrationError(
+        `a database is required: the server checks WRITE access on it. ` +
+          `Pass it to migrateUp/migrateDown or set the "database" option.`,
+      );
+    }
+    return db;
   }
 
   public getDatabases(): Promise<string[]> {
-    const request: Partial<Request<any>> = {
-      action: ClientAction.GET_DATABASE_NAMES,
-    };
-    return this.request(request);
+    return this.request({ action: ClientAction.GET_DATABASE_NAMES });
   }
 
   public getVersion(): Promise<{ version: string }> {
-    const request: Partial<Request<any>> = {
-      action: ClientAction.GET_VERSION,
-    };
-    return this.request(request);
+    return this.request({ action: ClientAction.GET_VERSION });
   }
 
   public getCollections(database: string): Promise<string[]> {
-    const request: Partial<Request<any>> = {
-      action: ClientAction.GET_COLLECTION_NAMES,
-      database,
-    };
-    return this.request(request);
+    return this.request({ action: ClientAction.GET_COLLECTION_NAMES, database });
   }
 
   public getCollectionSchema<T>(database: string, collection: string): Promise<{ schema: Schema<T>; locked: boolean }> {
-    const request: Partial<Request<any>> = {
-      action: ClientAction.GET_COLLECTION_SCHEMA,
-      database,
-      collection,
-    };
-    return this.request(request);
+    return this.request({ action: ClientAction.GET_COLLECTION_SCHEMA, database, collection });
   }
 
-  public lockCollectionSchema<T>(
+  public getCollectionSchemaLock(
     database: string,
     collection: string,
-  ): Promise<{ schema: Schema<T>; locked: boolean }> {
-    const request: Partial<Request<any>> = {
-      action: ClientAction.LOCK_COLLECTION_SCHEMA,
-      database,
-      collection,
-    };
-    return this.request(request);
+  ): Promise<{ collection: string; locked: boolean }> {
+    return this.request({ action: ClientAction.GET_COLLECTION_SCHEMA_LOCK, database, collection });
   }
 
-  public unlockCollectionSchema<T>(
+  public lockCollectionSchema(database: string, collection: string): Promise<{ collection: string; locked: boolean }> {
+    return this.request({ action: ClientAction.LOCK_COLLECTION_SCHEMA, database, collection });
+  }
+
+  public unlockCollectionSchema(
     database: string,
     collection: string,
-  ): Promise<{ schema: Schema<T>; locked: boolean }> {
-    const request: Partial<Request<any>> = {
-      action: ClientAction.UNLOCK_COLLECTION_SCHEMA,
-      database,
-      collection,
-    };
-    return this.request(request);
+  ): Promise<{ collection: string; locked: boolean }> {
+    return this.request({ action: ClientAction.UNLOCK_COLLECTION_SCHEMA, database, collection });
   }
 
   public getCollectionViews<T>(
     database: string,
     collection: string,
   ): Promise<Record<string, { transformQueries: TransformQuery<T>[] }>> {
-    const request: Partial<Request<any>> = {
-      action: ClientAction.GET_COLLECTION_VIEWS,
-      database,
-      collection,
-    };
-    return this.request(request);
+    return this.request({ action: ClientAction.GET_COLLECTION_VIEWS, database, collection });
   }
 
   public getHealth(): Promise<Record<'memory' | 'cpu' | 'gcp' | 'elu' | 'eld', number>> {
-    const request: Partial<Request<any>> = {
-      action: ClientAction.GET_HEALTH,
-    };
-    return this.request(request);
+    return this.request({ action: ClientAction.GET_HEALTH });
   }
 
+  /** Resolves with the transaction id (the server answers `{ transactionId }`). */
   public async startTransaction(startTransactionParameters: StartTransactionParameters): Promise<string> {
-    const request: Partial<Request<any>> = {
+    const data: { transactionId: string } | string = await this.request({
       database: startTransactionParameters.database,
       autoRollbackAfterMS: startTransactionParameters.autoRollBackAfterMs,
       action: ClientAction.START_TRANSACTION,
-    };
-    return this.request(request);
+    });
+    return typeof data === 'string' ? data : data?.transactionId;
   }
 
-  public async commitTransaction(manageTransactionParameters: ManageTransactionParameters): Promise<TransactionInfo> {
-    const request: Partial<Request<any>> = {
+  public commitTransaction(manageTransactionParameters: ManageTransactionParameters): Promise<TransactionInfo> {
+    return this.request({
       database: manageTransactionParameters.database,
       action: ClientAction.COMMIT_TRANSACTION,
       transactionId: manageTransactionParameters.transactionId,
-    };
-    return this.request(request);
+    });
   }
 
-  public async rollbackTransaction(manageTransactionParameters: ManageTransactionParameters): Promise<TransactionInfo> {
-    const request: Partial<Request<any>> = {
+  public rollbackTransaction(manageTransactionParameters: ManageTransactionParameters): Promise<TransactionInfo> {
+    return this.request({
       database: manageTransactionParameters.database,
       action: ClientAction.ROLLBACK_TRANSACTION,
       transactionId: manageTransactionParameters.transactionId,
-    };
-    return this.request(request);
+    });
   }
 
-  public async subscribe(key: string, subscriber: (databaseUpdate: DatabaseUpdate) => void): Promise<void> {
-    if (!this.subscribersConnection) {
-      this.subscribersConnection = new Connection({
+  /**
+   * `key` is "<database>" (every collection) or "<database>.<collection>". Several subscribers per key are
+   * allowed. Resolves once the subscriber connection is open.
+   */
+  public async subscribe(key: string, subscriber: Subscriber): Promise<void> {
+    if (!key || typeof key !== 'string') {
+      throw ErrorFactory.argumentError(`subscription key should be "<database>" or "<database>.<collection>"`);
+    }
+    if (typeof subscriber !== 'function') {
+      throw ErrorFactory.argumentError(`subscriber should be a function`);
+    }
+    if (!this.subscribers.has(key)) {
+      this.subscribers.set(key, new Set<Subscriber>());
+    }
+    this.subscribers.get(key).add(subscriber);
+    await this.ensureSubscribersConnection();
+  }
+
+  /** Removes one subscriber, or every subscriber of `key`. Closes the subscriber connection when none are left. */
+  public async unsubscribe(key: string, subscriber?: Subscriber): Promise<void> {
+    if (subscriber) {
+      this.subscribers.get(key)?.delete(subscriber);
+      if (!this.subscribers.get(key)?.size) {
+        this.subscribers.delete(key);
+      }
+    } else {
+      this.subscribers.delete(key);
+    }
+    if (!this.subscribers.size && this.subscribersConnection) {
+      const connection: Connection = this.subscribersConnection;
+      this.subscribersConnection = undefined;
+      this.subscribersConnecting = undefined;
+      await connection.disconnect();
+    }
+  }
+
+  private ensureSubscribersConnection(): Promise<void> {
+    if (!this.subscribersConnecting) {
+      const connection: Connection = new Connection({
         host: this.options.host,
         port: this.options.port,
         user: this.options.user,
-        connectionManager: this.connectionManager,
         password: this.options.password,
-        reconnectTimeoutValue: 10,
+        logger: this.options.logger,
+        connectionManager: this.connectionManager,
+        reconnectTimeoutValue: this.options.reconnectTimeoutValue,
+        secureServer: this.options.secureServer,
+        tls: this.options.tls,
         isSubscriber: true,
       });
-      await this.subscribersConnection.connect(this.options.connectTimeoutValue || DEFAULT_CONNECT_TIMEOUT_VALUE);
+      this.subscribersConnection = connection;
+      this.subscribersConnecting = connection
+        .connect(this.options.connectTimeoutValue || DEFAULT_CONNECT_TIMEOUT_VALUE)
+        .catch(async (error: Error) => {
+          this.subscribersConnection = undefined;
+          this.subscribersConnecting = undefined;
+          await connection.disconnect();
+          throw error;
+        });
     }
-    this.subscribers.set(key, subscriber);
+    return this.subscribersConnecting;
   }
 
   public createCollection<T>(
@@ -254,61 +321,24 @@ export class DianaDb {
     collection: string,
     schema: Schema<T>,
   ): Promise<{ collection: string; action: string }> {
-    const request: Partial<Request<any>> = {
-      action: ClientAction.ADD_COLLECTION,
-      database,
-      collection,
-      schema,
-    };
-    return this.request(request);
+    // addCollection rather than createCollection: older servers only know that name.
+    return this.request({ action: ClientAction.ADD_COLLECTION, database, collection, schema });
   }
 
-  public removeCollection<T>(database: string, collection: string): Promise<{ schema: Schema<T>; action: string }> {
-    const request: Partial<Request<any>> = {
-      action: ClientAction.REMOVE_COLLECTION,
-      database,
-      collection,
-    };
-    return this.request(request);
+  public removeCollection(database: string, collection: string): Promise<{ collection: string; action: string }> {
+    return this.request({ action: ClientAction.REMOVE_COLLECTION, database, collection });
   }
 
   public removeDatabase(database: string): Promise<{ database: string; action: string }> {
-    const request: Partial<Request<any>> = {
-      action: ClientAction.REMOVE_DATABASE,
-      database,
-    };
-    return this.request(request);
+    return this.request({ action: ClientAction.REMOVE_DATABASE, database });
   }
 
   public createDatabase(database: string): Promise<{ database: string; action: string }> {
-    const request: Partial<Request<any>> = {
-      action: ClientAction.CREATE_DATABASE,
-      database,
-    };
-    return this.request(request);
+    return this.request({ action: ClientAction.CREATE_DATABASE, database });
   }
 
-  protected request(request: Partial<Request<any>>): Promise<any> {
-    const clientRequestId = randomId();
-    request.clientRequestId = clientRequestId;
-    if (!request.timeoutValue) {
-      request.timeoutValue = DEFAULT_REQUEST_TIMEOUT_VALUE;
-    }
-    const responseKey = eventKeyHelper(clientRequestId, 'response');
-    const errorKey = eventKeyHelper(clientRequestId, 'error');
-    return new Promise((resolve, reject) => {
-      eventEmitter.addListener(responseKey, (response: ServerResponse<any>) => {
-        eventEmitter.removeAllListeners(responseKey);
-        eventEmitter.removeAllListeners(errorKey);
-        const { data } = response;
-        return resolve(data);
-      });
-      eventEmitter.addListener(errorKey, (error: string) => {
-        eventEmitter.removeAllListeners(responseKey);
-        eventEmitter.removeAllListeners(errorKey);
-        return reject(new Error(error));
-      });
-      this.controller.processRequest(request as Request<any>).catch(reject);
-    });
+  protected async request(request: Partial<Request<any>>): Promise<any> {
+    const response = await this.controller.request(request);
+    return response.data;
   }
 }

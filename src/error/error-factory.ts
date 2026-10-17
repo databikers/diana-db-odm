@@ -1,6 +1,42 @@
+/**
+ * Set on errors raised by requests, so callers can branch without parsing messages:
+ * - SERVER: the server rejected the request (validation, access, missing collection...); nothing was changed.
+ * - DURABILITY: the server applied the change in memory but could not write it to its write-ahead log.
+ *   The change is visible now and may be lost if the server crashes before its next snapshot.
+ * - TIMEOUT: no answer within the request timeout. The request may or may not have been applied.
+ * - CONNECTION: not connected, or the connection closed before the answer. May or may not have been applied.
+ */
+export type DianaDbErrorCode = 'SERVER' | 'DURABILITY' | 'TIMEOUT' | 'CONNECTION';
+
+export type DianaDbError = Error & { code: DianaDbErrorCode };
+
+// Prefix of the server's error text when the write-ahead log could not be written (server >= 2.x with WAL).
+const DURABILITY_ERROR_PREFIX: string = 'The change was applied but could not be written to disk';
+
 export class ErrorFactory {
   protected static construct(message: string) {
     return new Error(message);
+  }
+
+  protected static coded(message: string, code: DianaDbErrorCode): DianaDbError {
+    const error = new Error(message) as DianaDbError;
+    error.code = code;
+    return error;
+  }
+
+  /** An error string returned by the server for one request. */
+  public static serverError(message: string): DianaDbError {
+    return message.startsWith(DURABILITY_ERROR_PREFIX)
+      ? ErrorFactory.coded(`Durability Error: ${message}`, 'DURABILITY')
+      : ErrorFactory.coded(message, 'SERVER');
+  }
+
+  public static connectionError(message: string): DianaDbError {
+    return ErrorFactory.coded(`Connection Error: ${message}`, 'CONNECTION');
+  }
+
+  public static timeoutError(message: string): DianaDbError {
+    return ErrorFactory.coded(`Request Error: ${message}`, 'TIMEOUT');
   }
 
   public static modelOptionsError(message: string) {
