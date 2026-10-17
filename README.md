@@ -8,13 +8,13 @@ If you already know MongoDB, onboarding is quick — the query language is conce
 
 |                     |                                                                |
 | ------------------- | -------------------------------------------------------------- |
-| **Current release** | Server v2.5.3 / ODM v2.5.3                                     |
+| **Current release** | Server v3.0.0 / ODM v3.0.0                                     |
 | **ODM package**     | [`@diana-db/odm`](https://www.npmjs.com/package/@diana-db/odm) |
 | **Documentation**   | [diana-db.com](https://diana-db.com)                           |
 | **License**         | MIT with a usage restriction — see [License](#license)         |
 | **Maintainer**      | [Data Bikers Limited](https://databikers.com)                  |
 
-> Server >= 2.5.3 requires ODM >= 2.5.4.
+> Server >= 3.0.0 requires ODM >= 3.0.0.
 
 ---
 
@@ -341,53 +341,64 @@ Or with a connection string:
 
 ```typescript
 new DianaDb('diana-db://user:pass@localhost:34567?connectionPoolSize=5'); // plain
-new DianaDb('diana-dbs://user:pass@localhost:34567?connectionPoolSize=5'); // TLS
+new DianaDb('diana-dbs://user:pass@localhost:34567/shop?connectionPoolSize=5'); // TLS, default database "shop"
 ```
 
-`connectionPoolSize`, `connectTimeoutValue` and `reconnectTimeoutValue` are accepted as query parameters. The `diana-dbs://` scheme sets `secureServer: true`; any other protocol throws a configuration error.
+`connectionPoolSize`, `connectTimeoutValue`, `reconnectTimeoutValue` and `requestTimeoutValue` are accepted as query parameters, and `rejectUnauthorized=true` with `diana-dbs://`. The optional path sets the `database` option. User name and password are URL-decoded, so encode special characters (`p%40ss` for `p@ss`). The `diana-dbs://` scheme sets `secureServer: true`; any other protocol throws a configuration error.
 
-You can create as many instances as you like — each has its own models, migrations and subscribers, and connects independently.
+You can create as many instances as you like — each has its own migrations and subscribers, and connects independently. A model sends its requests through the instance passed as `dianaDb` in its options, or else through the instance most recently constructed before the model.
+
+`connect()` resolves as soon as one pooled connection is up; the rest connect in the background. If every connection is down later (server restart, network blip), requests are queued and sent when a connection is back, or fail with a `TIMEOUT` error after `requestTimeoutValue`. Requests already on a connection that drops fail at once with a `CONNECTION` error. After `disconnect()`, requests fail immediately until `connect()` is called again.
 
 ### Constructor Options
 
-| Option                  | Type                                                | Default   | Constraint               |
-| ----------------------- | --------------------------------------------------- | --------- | ------------------------ |
-| `host`                  | string                                              | –         | **required**             |
-| `port`                  | integer                                             | `34567`   | **required**, 1025–65535 |
-| `user`                  | string                                              | –         | **required**             |
-| `password`              | string                                              | –         | **required**             |
-| `connectionPoolSize`    | integer                                             | `5`       | >= 1                     |
-| `connectTimeoutValue`   | integer (ms)                                        | `30000`   | >= 100                   |
-| `reconnectTimeoutValue` | integer (ms)                                        | `1000`    | >= 100                   |
-| `secureServer`          | boolean                                             | `false`   | –                        |
-| `tls`                   | `{ cert, key, ca?, rejectUnauthorized? }` (Buffers) | –         | –                        |
-| `logger`                | object                                              | `console` | –                        |
+| Option                  | Type                                                     | Default   | Constraint   |
+| ----------------------- | -------------------------------------------------------- | --------- | ------------ |
+| `host`                  | string                                                   | –         | **required** |
+| `port`                  | integer                                                  | `34567`   | 1025–65535   |
+| `user`                  | string                                                   | –         | **required** |
+| `password`              | string                                                   | –         | **required** |
+| `connectionPoolSize`    | integer                                                  | `5`       | >= 1         |
+| `connectTimeoutValue`   | integer (ms)                                             | `30000`   | –            |
+| `reconnectTimeoutValue` | integer (ms)                                             | `1000`    | –            |
+| `requestTimeoutValue`   | integer (ms)                                             | `30000`   | >= 1         |
+| `database`              | string                                                   | –         | –            |
+| `secureServer`          | boolean                                                  | `false`   | –            |
+| `tls`                   | `{ cert?, key?, ca?, rejectUnauthorized?, servername? }` | –         | –            |
+| `logger`                | object                                                   | `console` | –            |
+
+- `database` is used by `migrateUp`, `migrateDown` and `getMigrations` when they are called without one.
+- `tls` values are Buffers (`readFileSync`) or PEM strings; `ca` may be an array. Other Node.js `tls.connect` options pass through. `cert`/`key` are only needed when the server verifies clients (mTLS).
+- `rejectUnauthorized` defaults to `false`, so self-signed servers work out of the box. **Set it to `true` with `ca` in production**: the certificate is then checked against `host` (or `servername`), so connect by the name in the certificate, not by IP.
 
 ### Client Methods
 
-| Method                   | Arguments                                                | Returns                                         |
-| ------------------------ | -------------------------------------------------------- | ----------------------------------------------- |
-| `connect`                | `connectTimeoutValue: number`                            | `Promise<boolean>`                              |
-| `disconnect`             | –                                                        | `Promise<void>`                                 |
-| `subscribe`              | `key: string`, `subscriber: (u: DatabaseUpdate) => void` | `Promise<void>`                                 |
-| `addMigration`           | `migration: Migration`                                   | `void`                                          |
-| `migrateUp`              | –                                                        | `Promise<void>`                                 |
-| `migrateDown`            | –                                                        | `Promise<void>`                                 |
-| `startTransaction`       | `{ database, autoRollBackAfterMs? }`                     | `Promise<string>`                               |
-| `commitTransaction`      | `{ database, transactionId }`                            | `Promise<TransactionInfo>`                      |
-| `rollbackTransaction`    | `{ database, transactionId }`                            | `Promise<TransactionInfo>`                      |
-| `getDatabases`           | –                                                        | `Promise<string[]>`                             |
-| `createDatabase`         | `database`                                               | `Promise<{ database, action }>`                 |
-| `removeDatabase`         | `database`                                               | `Promise<{ database, action }>`                 |
-| `getCollections`         | `database`                                               | `Promise<string[]>`                             |
-| `createCollection`       | `database, collection, schema`                           | `Promise<{ collection, action }>`               |
-| `removeCollection`       | `database, collection`                                   | `Promise<{ collection, action }>`               |
-| `getCollectionSchema`    | `database, collection`                                   | `Promise<{ schema, locked }>`                   |
-| `lockCollectionSchema`   | `database, collection`                                   | `Promise<{ collection, locked }>`               |
-| `unlockCollectionSchema` | `database, collection`                                   | `Promise<{ collection, locked }>`               |
-| `getCollectionViews`     | `database, collection`                                   | `Promise<Record<string, { transformQueries }>>` |
-| `getHealth`              | –                                                        | `Promise<HealthInfo>`                           |
-| `getVersion`             | –                                                        | `Promise<{ version: string }>`                  |
+| Method                    | Arguments                                                | Returns                                         |
+| ------------------------- | -------------------------------------------------------- | ----------------------------------------------- |
+| `connect`                 | `connectTimeoutValue: number`                            | `Promise<boolean>`                              |
+| `disconnect`              | –                                                        | `Promise<void>`                                 |
+| `subscribe`               | `key: string`, `subscriber: (u: DatabaseUpdate) => void` | `Promise<void>`                                 |
+| `unsubscribe`             | `key: string`, `subscriber?`                             | `Promise<void>`                                 |
+| `addMigration`            | `migration: Migration`                                   | `void`                                          |
+| `migrateUp`               | `database?`                                              | `Promise<MigrationInfo[]>`                      |
+| `migrateDown`             | `database?`, `steps?`                                    | `Promise<MigrationInfo[]>`                      |
+| `getMigrations`           | `database?`                                              | `Promise<string[]>`                             |
+| `startTransaction`        | `{ database, autoRollBackAfterMs? }`                     | `Promise<string>`                               |
+| `commitTransaction`       | `{ database, transactionId }`                            | `Promise<TransactionInfo>`                      |
+| `rollbackTransaction`     | `{ database, transactionId }`                            | `Promise<TransactionInfo>`                      |
+| `getDatabases`            | –                                                        | `Promise<string[]>`                             |
+| `createDatabase`          | `database`                                               | `Promise<{ database, action }>`                 |
+| `removeDatabase`          | `database`                                               | `Promise<{ database, action }>`                 |
+| `getCollections`          | `database`                                               | `Promise<string[]>`                             |
+| `createCollection`        | `database, collection, schema`                           | `Promise<{ collection, action }>`               |
+| `removeCollection`        | `database, collection`                                   | `Promise<{ collection, action }>`               |
+| `getCollectionSchema`     | `database, collection`                                   | `Promise<{ schema, locked }>`                   |
+| `getCollectionSchemaLock` | `database, collection`                                   | `Promise<{ collection, locked }>`               |
+| `lockCollectionSchema`    | `database, collection`                                   | `Promise<{ collection, locked }>`               |
+| `unlockCollectionSchema`  | `database, collection`                                   | `Promise<{ collection, locked }>`               |
+| `getCollectionViews`      | `database, collection`                                   | `Promise<Record<string, { transformQueries }>>` |
+| `getHealth`               | –                                                        | `Promise<HealthInfo>`                           |
+| `getVersion`              | –                                                        | `Promise<{ version: string }>`                  |
 
 ```typescript
 type HealthInfo = {
@@ -407,22 +418,22 @@ A schema is a configuration object describing the structure of stored documents.
 
 ### Field Options
 
-| Option          | Type                               | Description                                                                   | Required                                | Default |
-| --------------- | ---------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------- | ------- |
-| `type`          | `Types`                            | Field type                                                                    | **Yes**                                 | –       |
-| `required`      | boolean                            | Property must be present                                                      | No                                      | `false` |
-| `unique`        | boolean                            | Property must be unique                                                       | No                                      | `false` |
-| `mutable`       | boolean                            | Value may change after creation                                               | No                                      | `true`  |
-| `lowercase`     | boolean                            | **STRING only.** Lowercases the value                                         | No                                      | `false` |
-| `uppercase`     | boolean                            | **STRING only.** Uppercases the value                                         | No                                      | `false` |
-| `default`       | `T`, `() => T`, `() => Promise<T>` | Default value or factory, evaluated in the document's context                 | No                                      | –       |
-| `set`           | function                           | Applied to the incoming value on insert and update, before validation         | No                                      | –       |
-| `get`           | function                           | Applied to each found document. Skipped when the query uses transform queries | No                                      | –       |
-| `items`         | `Types`                            | **ARRAY only.** Item type                                                     | **Yes** (if ARRAY)                      | –       |
-| `reference`     | string                             | Referenced collection name                                                    | **Yes** (if type or items is REFERENCE) | –       |
-| `triggerRemove` | boolean                            | **REFERENCE only.** Remove this document when the referenced item is deleted  | No                                      | `false` |
-| `ttl`           | integer >= 5                       | **TIME only.** Time to live in ms from insertion                              | No                                      | –       |
-| `precision`     | integer 0–8                        | **NUMBER only.** Decimal places retained                                      | **Yes** (if NUMBER)                     | –       |
+| Option          | Type                               | Description                                                                     | Required                                | Default |
+| --------------- | ---------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------- | ------- |
+| `type`          | `Types`                            | Field type                                                                      | **Yes**                                 | –       |
+| `required`      | boolean                            | Property must be present                                                        | No                                      | `false` |
+| `unique`        | boolean                            | Property must be unique                                                         | No                                      | `false` |
+| `mutable`       | boolean                            | Value may change after creation                                                 | No                                      | `true`  |
+| `lowercase`     | boolean                            | **STRING only.** Lowercases the value                                           | No                                      | `false` |
+| `uppercase`     | boolean                            | **STRING only.** Uppercases the value                                           | No                                      | `false` |
+| `default`       | `T`, `() => T`, `() => Promise<T>` | Default value or factory, evaluated in the document's context                   | No                                      | –       |
+| `set`           | function                           | Applied to the incoming value on insert and update, before validation           | No                                      | –       |
+| `get`           | function                           | Applied to each found document. Skipped when the query uses transform queries   | No                                      | –       |
+| `items`         | `Types`                            | **ARRAY only.** Item type                                                       | **Yes** (if ARRAY)                      | –       |
+| `reference`     | string                             | Referenced collection name                                                      | **Yes** (if type or items is REFERENCE) | –       |
+| `triggerRemove` | boolean                            | **REFERENCE only.** Remove this document when the referenced item is deleted    | No                                      | `false` |
+| `ttl`           | integer >= 5                       | **TIME only.** Time to live in ms from insertion                                | No                                      | –       |
+| `precision`     | integer 0–8                        | **NUMBER only.** Decimal places retained. Without it values are stored as given | No                                      | –       |
 
 Enforced exclusions:
 
@@ -435,7 +446,7 @@ Enforced exclusions:
 | Type              | Description                                  | Notes                                                              |
 | ----------------- | -------------------------------------------- | ------------------------------------------------------------------ |
 | `Types.STRING`    | String                                       | Supports `lowercase` / `uppercase`                                 |
-| `Types.NUMBER`    | Number                                       | Requires `precision`                                               |
+| `Types.NUMBER`    | Number                                       | Optional `precision` (fixed decimal places, e.g. money)            |
 | `Types.BOOLEAN`   | Boolean                                      | –                                                                  |
 | `Types.POSITION`  | `{ x, y }` point                             | Enables spatial queries                                            |
 | `Types.OBJECT_ID` | Hex string identifier                        | Not BSON. `/^[0-9a-f]{12}-[0-9a-f]{1,}-[0-9a-f]{11}-[0-9a-f]{9}$/` |
@@ -475,10 +486,13 @@ const userModel = new Model<User>({
   collection: 'user',
   name: 'User',
   schema: userSchema,
+  // dianaDb: secondClient, // optional: which DianaDb instance this model uses
 });
 
 await userModel.init();
 ```
+
+`init()` is safe to call concurrently (callers share one attempt) and can be retried after a failure. `insert` and `update` apply defaults and setters to a copy, so the object you pass is not modified. `find`, `count`, `update` and `remove` accept one FindQuery or an array; `find()` and `count()` without filters match everything.
 
 | Method                                                             | Description                                                                     | Returns                                         |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------- | ----------------------------------------------- |
@@ -689,7 +703,7 @@ Values may be plain values, or an operator object describing an update strategy 
 | `$concat`  | `{ delimiter, parts[] }`       | Concatenates `parts` with `delimiter`                                     |
 | `$replace` | `[search, replacement, flags]` | Replaces a substring; `flags` is a RegExp flag combination such as `'gm'` |
 
-**Number** — each operand accepts a literal or a pointer string
+**Number** — each operand takes a number literal
 
 | Operator                       | Effect                             |
 | ------------------------------ | ---------------------------------- |
@@ -760,10 +774,15 @@ The view name must not collide with a collection or view name in that database. 
 ```typescript
 // 'user.post' = database 'user', collection 'post'
 // 'user' alone = every collection in the 'user' database
-await dianaDb.subscribe('user.post', (databaseUpdate) => {
+const onPost = (databaseUpdate) => {
   // handle the update
-});
+};
+await dianaDb.subscribe('user.post', onPost);
+
+await dianaDb.unsubscribe('user.post', onPost); // or unsubscribe('user.post') for every subscriber of the key
 ```
+
+Several subscribers per key are allowed; one that throws does not affect the others. Subscriptions use a dedicated connection that reconnects on its own, and `disconnect()` closes it. Updates are delivered only for databases the user can read.
 
 | Field         | Type                               | Description                             |
 | ------------- | ---------------------------------- | --------------------------------------- |
@@ -799,7 +818,7 @@ try {
 }
 ```
 
-`autoRollBackAfterMs` is clamped by the server's `transactions_min_auto_rollback_value` and `transactions_max_auto_rollback_value`. Both calls resolve to `{ transactionId, status }`, where status is `'committed'` or `'rolled-back'`.
+`startTransaction` resolves to the transaction id string. `autoRollBackAfterMs` is clamped by the server's `transactions_min_auto_rollback_value` and `transactions_max_auto_rollback_value`. Both calls resolve to `{ transactionId, status }`, where status is `'committed'` or `'rolled-back'`.
 
 ---
 
@@ -820,11 +839,40 @@ dianaDb.addMigration({
 });
 
 await dianaDb.connect(5000);
-await dianaDb.migrateUp();
-await dianaDb.migrateDown();
+await dianaDb.migrateUp('test'); // or set the `database` option and call migrateUp()
+await dianaDb.migrateDown('test', 1); // revert only the last applied migration
 ```
 
+The server keeps one list of applied migrations but checks WRITE access on a database, so each call needs one: pass it, or set the `database` constructor option (or the connection string path). `migrateUp` runs pending migrations in ascending index order; `migrateDown` reverts applied ones in descending order — all of them, or the last `steps`. Both resolve with the server's record of each migration they ran, `{ name, status }` with status `'up'` or `'down'` (the server answers `{ migration: { name, status } }` per call). If the server does not confirm a migration, the call throws a migration error naming it — its `up()`/`down()` has already run at that point, so check its effects before retrying.
+
 A migration may span many databases and collections. There is a single list of applied migrations, so names and indexes must be unique — a duplicate index throws immediately. Migrations run in ascending index order. **Never edit the code inside a migration after it has run.**
+
+---
+
+## Errors
+
+Every failed request rejects with an `Error` that carries a `code`:
+
+| `code`       | Meaning                                                                                                                                        |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SERVER`     | The server rejected the request (validation, access, unknown collection…). Nothing was changed                                                 |
+| `DURABILITY` | The change was applied but the server could not write it to its write-ahead log. It may be lost if the server crashes before the next snapshot |
+| `TIMEOUT`    | No answer within `requestTimeoutValue`. The request may or may not have been applied                                                           |
+| `CONNECTION` | Not connected, or the connection closed before the answer. The request may or may not have been applied                                        |
+
+```typescript
+import { DianaDbError } from '@diana-db/odm';
+
+try {
+  await orderModel.insert(order);
+} catch (e) {
+  if ((e as DianaDbError).code === 'DURABILITY') {
+    // applied, not yet on disk: alert, and retrying is NOT needed
+  }
+}
+```
+
+Validation errors raised by the ODM itself (schema, queries, options) are thrown before anything is sent and carry no `code`.
 
 ---
 
@@ -870,6 +918,7 @@ Server and ODM versions are released in step and must be kept compatible.
 
 Recent highlights:
 
+- **v3.0.0** — core optimizations and refactoring
 - **v2.5.3** — client-level database management (`createDatabase`, `removeDatabase`, `createCollection`, `removeCollection`), `replaceRoot` in `LookupQuery`, core optimizations
 - **v2.2.1** — `getVersion()`
 - **v2.1.3 / ODM 2.1.0** — `removeView`, `getViews`, `getCollectionViews`
