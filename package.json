@@ -1,6 +1,6 @@
 {
   "name": "@diana-db/odm",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "ODM for DianaDB",
   "author": "Data Bikers Limited",
   "license": "MIT",
@@ -15,21 +15,17 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@types/joi": "^17.2.3",
     "@eslint/js": "^10.0.1",
-    "@types/node": "24.13.6",
+    "@types/node": "26.6.6",
     "@types/prettier": "3.0.0",
-    "@typescript-eslint/eslint-plugin": "8.71.2",
-    "@typescript-eslint/parser": "8.71.2",
-    "eslint": "10.8.1",
+    "@typescript-eslint/eslint-plugin": "8.73.0",
+    "@typescript-eslint/parser": "8.73.0",
+    "eslint": "10.15.0",
     "husky": "^9.1.7",
     "prettier-plugin-multiline-arrays": "4.1.11",
-    "tsc-alias": "^1.9.7",
+    "tsc-alias": "^1.9.10",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.71.2"
-  },
-  "dependencies": {
-    "joi": "18.3.0"
+    "typescript-eslint": "8.73.0"
   },
   "repository": {
     "type": "git",
