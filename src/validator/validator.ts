@@ -9,7 +9,40 @@ import {
   sortQueryValidator,
   transformQueriesValidator,
 } from './validation-helpers';
-import { objectIdQuery } from './schemas';
+import { ValidationResult } from './rules';
+
+// Filter validators by stored type (array fields are filtered by their item type)
+const filterValidatorByType: Record<string, (data: any) => ValidationResult> = {
+  [Types.BOOLEAN]: filterQueryValidator.boolean,
+  [Types.STRING]: filterQueryValidator.string,
+  [Types.REFERENCE]: filterQueryValidator.objectId,
+  [Types.OBJECT_ID]: filterQueryValidator.objectId,
+  [Types.NUMBER]: filterQueryValidator.number,
+  [Types.TIME]: filterQueryValidator.time,
+  [Types.POSITION]: filterQueryValidator.geo,
+  [Types.VECTOR]: filterQueryValidator.vector,
+};
+
+const dataValidatorByType: Record<string, (data: any) => ValidationResult> = {
+  [Types.BOOLEAN]: setDataValidator.boolean,
+  [Types.STRING]: setDataValidator.string,
+  [Types.REFERENCE]: setDataValidator.objectId,
+  [Types.OBJECT_ID]: setDataValidator.objectId,
+  [Types.NUMBER]: setDataValidator.number,
+  [Types.TIME]: setDataValidator.time,
+  [Types.POSITION]: setDataValidator.geo,
+  [Types.VECTOR]: setDataValidator.vector,
+};
+
+const arrayDataValidatorByItemType: Record<string, (data: any) => ValidationResult> = {
+  [Types.BOOLEAN]: setDataValidator.arrayOfBoolean,
+  [Types.STRING]: setDataValidator.arrayOfString,
+  [Types.REFERENCE]: setDataValidator.arrayOfObjectId,
+  [Types.OBJECT_ID]: setDataValidator.arrayOfObjectId,
+  [Types.NUMBER]: setDataValidator.arrayOfNumber,
+  [Types.TIME]: setDataValidator.arrayOfTime,
+  [Types.POSITION]: setDataValidator.arrayOfGeo,
+};
 
 export class Validator<T> {
   protected options: ValidatorOptions<any>;
@@ -18,62 +51,42 @@ export class Validator<T> {
     this.options = options;
   }
 
+  /** Only the schema's own fields count: "constructor", "toString"... are never fields. */
+  protected field(key: string): any {
+    return Object.prototype.hasOwnProperty.call(this.options.schema, key) ? this.options.schema[key] : undefined;
+  }
+
   public filterQueries(filterQueries: any[]) {
-    let validationResult: any;
     for (let i = 0; i < filterQueries.length; i = i + 1) {
       const filterQuery: any = filterQueries[i];
       for (const key in filterQuery) {
-        if (!this.options.schema[key]) {
+        const definition: any = this.field(key);
+        if (!definition) {
           throw ErrorFactory.findQueryError(
             `property '${key}' doesn't exist in the '${this.options.name}' collection's Schema`,
           );
         }
-        switch (this.options.schema[key].type) {
-          case Types.ARRAY:
-            switch ((this.options.schema[key] as any).items) {
-              case Types.BOOLEAN:
-                validationResult = filterQueryValidator.boolean(filterQuery[key]);
-                break;
-              case Types.STRING:
-                validationResult = filterQueryValidator.string(filterQuery[key]);
-                break;
-              case Types.REFERENCE:
-              case Types.OBJECT_ID:
-                validationResult = filterQueryValidator.objectId(filterQuery[key]);
-                break;
-              case Types.NUMBER:
-                validationResult = filterQueryValidator.number(filterQuery[key]);
-                break;
-              case Types.TIME:
-                validationResult = filterQueryValidator.time(filterQuery[key]);
-                break;
-              case Types.POSITION:
-                validationResult = filterQueryValidator.geo(filterQuery[key]);
-                break;
-            }
-            break;
-          case Types.BOOLEAN:
-            validationResult = filterQueryValidator.boolean(filterQuery[key]);
-            break;
-          case Types.STRING:
-            validationResult = filterQueryValidator.string(filterQuery[key]);
-            break;
-          case Types.REFERENCE:
-          case Types.OBJECT_ID:
-            validationResult = filterQueryValidator.objectId(filterQuery[key]);
-            break;
-          case Types.NUMBER:
-            validationResult = filterQueryValidator.number(filterQuery[key]);
-            break;
-          case Types.TIME:
-            validationResult = filterQueryValidator.time(filterQuery[key]);
-            break;
-          case Types.POSITION:
-            validationResult = filterQueryValidator.geo(filterQuery[key]);
-            break;
+        const type: string = definition.type === Types.ARRAY ? definition.items : definition.type;
+        const validator = filterValidatorByType[type];
+        if (!validator) {
+          continue;
         }
-        if (validationResult && validationResult.error) {
+        const validationResult: ValidationResult = validator(filterQuery[key]);
+        if (validationResult.error) {
           throw ErrorFactory.findQueryError(validationResult.error.message);
+        }
+        if (type === Types.VECTOR) {
+          for (const operator of [
+            '$neighbors',
+            '$direction',
+          ]) {
+            const vector: number[] | undefined = filterQuery[key]?.[operator]?.vector;
+            if (vector && vector.length !== definition.dimensions) {
+              throw ErrorFactory.findQueryError(
+                `"${key}.${operator}.vector" must have ${definition.dimensions} dimensions, got ${vector.length}`,
+              );
+            }
+          }
         }
       }
     }
@@ -100,9 +113,9 @@ export class Validator<T> {
   }
 
   public data(data: any, update: boolean = false) {
-    let validationResult: any;
     for (const key in data) {
-      if (!this.options.schema[key]) {
+      const definition: any = this.field(key);
+      if (!definition) {
         throw ErrorFactory.schemaError(
           `property '${key}' doesn't exist in Schema of the collection '${this.options.name}'`,
           key,
@@ -110,58 +123,28 @@ export class Validator<T> {
       }
       if (
         !update &&
-        this.options.schema[key].type !== Types.POSITION &&
+        definition.type !== Types.POSITION &&
         typeof data[key] === 'object' &&
-        !(Array.isArray(data[key]) && this.options.schema[key].type === Types.ARRAY)
+        !(Array.isArray(data[key]) && (definition.type === Types.ARRAY || definition.type === Types.VECTOR))
       ) {
         throw ErrorFactory.schemaError(`property '${key}' should not be an object'`, key);
       }
-      switch (this.options.schema[key].type) {
-        case Types.ARRAY:
-          switch ((this.options.schema[key] as any).items) {
-            case Types.BOOLEAN:
-              validationResult = setDataValidator.arrayOfBoolean(data[key]);
-              break;
-            case Types.STRING:
-              validationResult = setDataValidator.arrayOfString(data[key]);
-              break;
-            case Types.REFERENCE:
-            case Types.OBJECT_ID:
-              validationResult = setDataValidator.arrayOfObjectId(data[key]);
-              break;
-            case Types.NUMBER:
-              validationResult = setDataValidator.arrayOfNumber(data[key]);
-              break;
-            case Types.TIME:
-              validationResult = setDataValidator.arrayOfTime(data[key]);
-              break;
-            case Types.POSITION:
-              validationResult = setDataValidator.arrayOfGeo(data[key]);
-              break;
-          }
-          break;
-        case Types.BOOLEAN:
-          validationResult = setDataValidator.boolean(data[key]);
-          break;
-        case Types.STRING:
-          validationResult = setDataValidator.string(data[key]);
-          break;
-        case Types.REFERENCE:
-        case Types.OBJECT_ID:
-          validationResult = setDataValidator.objectId(data[key]);
-          break;
-        case Types.NUMBER:
-          validationResult = setDataValidator.number(data[key]);
-          break;
-        case Types.TIME:
-          validationResult = setDataValidator.time(data[key]);
-          break;
-        case Types.POSITION:
-          validationResult = setDataValidator.geo(data[key]);
-          break;
+      const validator =
+        definition.type === Types.ARRAY
+          ? arrayDataValidatorByItemType[definition.items]
+          : dataValidatorByType[definition.type];
+      if (!validator) {
+        continue;
       }
-      if (validationResult && validationResult.error) {
+      const validationResult: ValidationResult = validator(data[key]);
+      if (validationResult.error) {
         throw ErrorFactory.schemaError(validationResult.error.message, key);
+      }
+      if (definition.type === Types.VECTOR && data[key].length !== definition.dimensions) {
+        throw ErrorFactory.schemaError(
+          `property '${key}' must have ${definition.dimensions} dimensions, got ${data[key].length}`,
+          key,
+        );
       }
     }
   }

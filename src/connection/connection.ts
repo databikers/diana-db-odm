@@ -2,7 +2,7 @@ import { isIP, Socket } from 'net';
 import { connect as tlsConnect, TLSSocket } from 'tls';
 
 import { ConnectOptions } from '@options';
-import { CryptoHelper } from '@helper';
+import { CryptoHelper, parseJson } from '@helper';
 import { Request } from '@dto';
 
 // Largest response line accepted from the server (base64). Protects memory from a line that never ends.
@@ -227,7 +227,8 @@ export class Connection {
   private processLine(line: string): boolean {
     let response: any;
     try {
-      response = JSON.parse(CryptoHelper.decrypt(this.options.password, line));
+      // same hardening as the server: prototype keys dropped, nesting limited to 256 levels
+      response = parseJson(CryptoHelper.decrypt(this.options.password, line));
     } catch (e) {
       // A complete line that does not decrypt means a wrong password or a corrupted stream. Buffering it would
       // poison every following response, so drop the connection and let it reconnect cleanly.

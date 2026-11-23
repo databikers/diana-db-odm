@@ -6,3 +6,4 @@ export * from './boolean-find-query';
 export * from './number-find-query';
 export * from './position-find-query';
 export * from './reference-query';
+export * from './vector-find-query';

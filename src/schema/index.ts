@@ -8,3 +8,4 @@ export * from './position-field-definition';
 export * from './reference-field-definition';
 export * from './string-field-definition';
 export * from './time-field-definition';
+export * from './vector-field-definition';

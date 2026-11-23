@@ -6,6 +6,7 @@ import { ArrayFieldDefinition } from './array-field-definition';
 import { NumberFieldDefinition } from './number-field-definition';
 import { PositionFieldDefinition } from './position-field-definition';
 import { TimeFieldDefinition } from './time-field-definition';
+import { VectorFieldDefinition } from './vector-field-definition';
 
 export type SchemaItem =
   | BooleanFieldDefinition
@@ -15,6 +16,7 @@ export type SchemaItem =
   | ArrayFieldDefinition
   | NumberFieldDefinition
   | PositionFieldDefinition
+  | VectorFieldDefinition
   | TimeFieldDefinition;
 
 export interface Schema<T extends Record<string, any>> {

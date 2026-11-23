@@ -1,4 +1,3 @@
-const joi = require('joi');
 import {
   numberFieldExtended,
   stringField,
@@ -23,9 +22,12 @@ import {
   sortQuery,
   clientOptions,
   modelOptions,
+  vectorField,
+  vectorQuery,
 } from './schemas';
 
 import { defaultValidationOptions } from './options';
+import { v } from './rules';
 
 const filterQueryValidator: any = {
   string(data: any) {
@@ -45,6 +47,9 @@ const filterQueryValidator: any = {
   },
   geo(data: any) {
     return geoQuery.validate(data);
+  },
+  vector(data: any) {
+    return vectorQuery.validate(data);
   },
 };
 
@@ -66,6 +71,9 @@ const setDataValidator: any = {
   },
   geo(data: any) {
     return geoField.validate(data, defaultValidationOptions);
+  },
+  vector(data: any) {
+    return vectorField.validate(data);
   },
   arrayOfBoolean(data: any) {
     return arrayOfBooleanField.validate(data, defaultValidationOptions);
@@ -95,8 +103,10 @@ const transformQueriesValidator = (data: any[]) => {
   return transformQueries.validate(data, defaultValidationOptions);
 };
 
+const isoDateString = v.string().isoDate();
+
 const validateTimeString = (data: any) => {
-  return joi.string().isoDate().validate(data);
+  return isoDateString.validate(data);
 };
 
 const sortQueryValidator = (data: any) => {

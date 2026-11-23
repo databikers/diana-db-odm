@@ -6,5 +6,6 @@ export enum Types {
   TIME = 'TIME',
   REFERENCE = 'REFERENCE',
   POSITION = 'POSITION',
+  VECTOR = 'VECTOR',
   ARRAY = 'ARRAY',
 }

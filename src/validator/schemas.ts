@@ -1,81 +1,81 @@
 import { Types, UnitOfTime, Weekday } from '@const';
+import { v } from './rules';
 
-const joi = require('joi');
+const pointer = v.string().regex(/^\$[A-Za-z]+[A-Za-z0-9_]+/);
 
-const pointer = joi.string().regex(/^\$[A-Za-z]+[A-Za-z0-9_]+/);
+const pemInput = v.alternatives(v.string(), v.binary());
 
-const pemInput = joi.alternatives(joi.string(), joi.binary());
-
-export const clientOptions = joi.object({
-  port: joi.number().positive().integer().min(1025).max(65535),
-  host: joi.string().required(),
-  user: joi.string().required(),
-  password: joi.string().required(),
-  connectionPoolSize: joi.number().positive().integer().min(1),
-  connectTimeoutValue: joi.number().positive().integer().allow(0),
-  reconnectTimeoutValue: joi.number().positive().integer().allow(0),
-  requestTimeoutValue: joi.number().positive().integer().min(1),
-  database: joi.string(),
-  secureServer: joi.boolean(),
-  logger: joi.any(),
+export const clientOptions = v.object({
+  port: v.number().positive().integer().min(1025).max(65535),
+  host: v.string().required(),
+  user: v.string().required(),
+  password: v.string().required(),
+  connectionPoolSize: v.number().positive().integer().min(1),
+  connectTimeoutValue: v.number().positive().integer().allow(0),
+  reconnectTimeoutValue: v.number().positive().integer().allow(0),
+  requestTimeoutValue: v.number().positive().integer().min(1),
+  database: v.string(),
+  secureServer: v.boolean(),
+  logger: v.any(),
   // Buffers, as in the README (readFileSync), or PEM strings. Other node tls options pass through.
-  tls: joi
+  tls: v
     .object({
       cert: pemInput,
       key: pemInput,
-      ca: joi.alternatives(pemInput, joi.array().items(pemInput)),
-      rejectUnauthorized: joi.boolean(),
-      servername: joi.string(),
+      ca: v.alternatives(pemInput, v.array().items(pemInput)),
+      rejectUnauthorized: v.boolean(),
+      servername: v.string(),
     })
     .unknown(true)
     .optional(),
 });
 
-const numberFieldExtended = joi.alternatives(
-  joi.number(),
+const numberFieldExtended = v.alternatives(
+  v.number(),
   pointer,
-  joi.object({
-    $add: joi.number(),
-    $subtract: joi.number(),
-    $multiply: joi.number(),
-    $divide: joi.number().disallow(0),
-    $round: joi.number().integer().min(0).max(8),
+  v.object({
+    $add: v.number(),
+    $subtract: v.number(),
+    $multiply: v.number(),
+    $divide: v.number().disallow(0),
+    $round: v.number().integer().min(0).max(8),
   }),
 );
 
-const stringField = joi.alternatives(
-  joi.string(),
+const stringField = v.alternatives(
+  v.string(),
   pointer,
-  joi.object({
-    $concat: joi.object({
-      delimiter: joi.string().required(),
-      parts: joi.array().items(joi.string()),
+  v.object({
+    $concat: v.object({
+      delimiter: v.string().required(),
+      parts: v.array().items(v.string()),
     }),
-    $replace: joi.array().min(3).max(3).items(joi.string()),
+    $replace: v.array().min(3).max(3).items(v.string()),
   }),
 );
-const objectIdField = joi.alternatives(
+const objectIdField = v.alternatives(
   pointer,
-  joi.string().regex(/^[0-9a-f]{12}-[0-9a-f]{1,}-[0-9a-f]{11}-[0-9a-f]{9}$/),
+  // <server id: MAC address by default, or the server's server_id>-<pid>-<timestamp>-<random>
+  v.string().regex(/^[A-Za-z0-9_]{1,64}-[0-9a-f]{1,}-[0-9a-f]{11}-[0-9a-f]{9}$/),
 );
 
-const timeFieldItem = joi.object({
-  amount: joi.number().positive().integer().required(),
-  unit: joi
+const timeFieldItem = v.object({
+  amount: v.number().positive().integer().required(),
+  unit: v
     .string()
     .valid(...Object.values(UnitOfTime))
     .required(),
 });
 
-const weekday = joi.string().valid(...Object.values(Weekday));
+const weekday = v.string().valid(...Object.values(Weekday));
 
-const unitOfTime = joi.string().valid(...Object.values(UnitOfTime));
+const unitOfTime = v.string().valid(...Object.values(UnitOfTime));
 
-const timeField = joi.alternatives(
-  joi.string().isoDate(),
-  joi.number().positive().integer(),
+const timeField = v.alternatives(
+  v.string().isoDate(),
+  v.number().positive().integer(),
   pointer,
-  joi
+  v
     .object({
       $add: timeFieldItem,
       $subtract: timeFieldItem,
@@ -86,111 +86,111 @@ const timeField = joi.alternatives(
     })
     .min(1),
 );
-const booleanField = joi.alternatives(joi.boolean().allow(true, false), pointer);
+const booleanField = v.alternatives(v.boolean().allow(true, false), pointer);
 
-const geoField = joi.alternatives(
-  joi.object({
-    x: joi.number().required(),
-    y: joi.number().required(),
+const geoField = v.alternatives(
+  v.object({
+    x: v.number().required(),
+    y: v.number().required(),
   }),
   pointer,
 );
 
-const arrayExtended = joi
+const arrayExtended = v
   .object({
-    $addItem: joi.any(),
-    $removeItem: joi.any(),
+    $addItem: v.any(),
+    $removeItem: v.any(),
   })
   .min(1)
   .max(1);
 
-const arrayOfNumberField = joi.alternatives(joi.array().items(numberFieldExtended), arrayExtended);
-const arrayOfStringField = joi.alternatives(joi.array().items(stringField), arrayExtended);
-const arrayOfBooleanField = joi.array().items(booleanField);
-const arrayOfTimeField = joi.array().items(timeField);
-const arrayOfObjectIdField = joi.array().items(objectIdField);
-const arrayOfGeoField = joi.array().items(geoField);
+const arrayOfNumberField = v.alternatives(v.array().items(numberFieldExtended), arrayExtended);
+const arrayOfStringField = v.alternatives(v.array().items(stringField), arrayExtended);
+const arrayOfBooleanField = v.array().items(booleanField);
+const arrayOfTimeField = v.array().items(timeField);
+const arrayOfObjectIdField = v.array().items(objectIdField);
+const arrayOfGeoField = v.array().items(geoField);
 
-const numberQuery = joi.alternatives().try(
-  joi.object({
-    $in: joi.array().items(joi.number()),
-    $nin: joi.array().items(joi.number()),
-    $eq: joi.number(),
-    $ne: joi.number(),
-    $lt: joi.number(),
-    $gt: joi.number(),
-    $lte: joi.number(),
-    $gte: joi.number(),
+const numberQuery = v.alternatives().try(
+  v.object({
+    $in: v.array().items(v.number()),
+    $nin: v.array().items(v.number()),
+    $eq: v.number(),
+    $ne: v.number(),
+    $lt: v.number(),
+    $gt: v.number(),
+    $lte: v.number(),
+    $gte: v.number(),
   }),
-  joi.number(),
+  v.number(),
 );
 
-const geoQuery = joi.object({
-  $insideCircle: joi.object({
+const geoQuery = v.object({
+  $insideCircle: v.object({
     center: geoField.required(),
-    radius: joi.number().positive().required(),
+    radius: v.number().positive().required(),
   }),
-  $outsideCircle: joi.object({
+  $outsideCircle: v.object({
     center: geoField.required(),
-    radius: joi.number().positive().required(),
+    radius: v.number().positive().required(),
   }),
-  $insidePolygon: joi.array().items(geoField).min(3),
-  $outsidePolygon: joi.array().items(geoField).min(3),
-  $nearLines: joi.object({
-    lines: joi.array().items(joi.array().items(geoField).min(2).max(2)).min(1).required(),
-    distance: joi.number().positive().required(),
+  $insidePolygon: v.array().items(geoField).min(3),
+  $outsidePolygon: v.array().items(geoField).min(3),
+  $nearLines: v.object({
+    lines: v.array().items(v.array().items(geoField).min(2).max(2)).min(1).required(),
+    distance: v.number().positive().required(),
   }),
-  $farFromLines: joi.object({
-    lines: joi.array().items(joi.array().items(geoField).min(2).max(2)).min(1).required(),
-    distance: joi.number().positive().allow(0).required(),
+  $farFromLines: v.object({
+    lines: v.array().items(v.array().items(geoField).min(2).max(2)).min(1).required(),
+    distance: v.number().positive().allow(0).required(),
   }),
 });
 
-const stringQuery = joi.alternatives().try(
-  joi.object({
-    $regex: joi.string(),
-    $in: joi.array().items(joi.string()),
-    $nin: joi.array().items(joi.string()),
-    $eq: joi.string(),
-    $ne: joi.string(),
-    $startsWith: joi.string(),
-    $notStartsWith: joi.string(),
-    $endsWith: joi.string(),
-    $notEndsWith: joi.string(),
-    $cn: joi.string(),
-    $nc: joi.string(),
+const stringQuery = v.alternatives().try(
+  v.object({
+    $regex: v.string(),
+    $in: v.array().items(v.string()),
+    $nin: v.array().items(v.string()),
+    $eq: v.string(),
+    $ne: v.string(),
+    $startsWith: v.string(),
+    $notStartsWith: v.string(),
+    $endsWith: v.string(),
+    $notEndsWith: v.string(),
+    $cn: v.string(),
+    $nc: v.string(),
   }),
-  joi.string(),
+  v.string(),
 );
 
-const objectIdQuery = joi.alternatives().try(
-  joi
+const objectIdQuery = v.alternatives().try(
+  v
     .object({
-      $in: joi.array().items(objectIdField),
-      $nin: joi.array().items(objectIdField),
+      $in: v.array().items(objectIdField),
+      $nin: v.array().items(objectIdField),
       $eq: objectIdField,
       $ne: objectIdField,
-      $subQuery: joi.any(),
+      $subQuery: v.any(),
     })
     .min(1)
     .max(1),
   objectIdField,
 );
 
-const booleanQuery = joi.alternatives().try(
-  joi
+const booleanQuery = v.alternatives().try(
+  v
     .object({
-      $in: joi.array().items(joi.boolean()),
-      $nin: joi.array().items(joi.boolean()),
-      $eq: joi.boolean(),
-      $ne: joi.boolean(),
+      $in: v.array().items(v.boolean()),
+      $nin: v.array().items(v.boolean()),
+      $eq: v.boolean(),
+      $ne: v.boolean(),
     })
     .min(1)
     .max(1),
-  joi.boolean(),
+  v.boolean(),
 );
 
-const timeQuery = joi
+const timeQuery = v
   .object({
     $year: numberQuery,
     $month: numberQuery,
@@ -206,86 +206,119 @@ const timeQuery = joi
   })
   .min(1);
 
-const schemaItem = joi
+// A document holds one vector per VECTOR field: arrays of vectors are not supported.
+const arrayItemTypes: Types[] = Object.values(Types).filter((type: Types) => type !== Types.VECTOR);
+
+// Same limit as the server: 65536 dimensions are 512 KB per document.
+const MAX_VECTOR_DIMENSIONS: number = 65536;
+
+const vectorField = v.array().items(v.number()).min(1).max(MAX_VECTOR_DIMENSIONS);
+
+const vectorQuery = v
   .object({
-    type: joi
+    $neighbors: v.object({
+      vector: vectorField.required(),
+      count: v.number().positive().integer(),
+      metric: v.string().valid('euclidean', 'cosine', 'dot'),
+      maxDistance: v.number().min(0),
+    }),
+    $direction: v.object({
+      vector: vectorField.required(),
+      minSimilarity: v.number().min(-1).max(1).required(),
+      count: v.number().positive().integer(),
+    }),
+  })
+  .min(1);
+
+const schemaItem = v
+  .object({
+    type: v
       .string()
       .valid(...Object.values(Types))
       .required(),
-    items: joi
+    items: v
       .when('type', {
         is: Types.ARRAY,
-        then: joi
+        then: v
           .string()
-          .valid(...Object.values(Types))
+          .valid(...arrayItemTypes)
           .required(),
       })
       .when('type', {
         not: Types.ARRAY,
-        then: joi.forbidden(),
+        then: v.forbidden(),
       }),
-    uppercase: joi
+    uppercase: v
       .when('type', {
         is: Types.STRING,
-        then: joi.boolean(),
+        then: v.boolean(),
       })
       .when('type', {
         not: Types.STRING,
-        then: joi.forbidden(),
+        then: v.forbidden(),
       }),
-    lowercase: joi
+    lowercase: v
       .when('type', {
         is: Types.STRING,
-        then: joi.boolean(),
+        then: v.boolean(),
       })
       .when('type', {
         not: Types.STRING,
-        then: joi.forbidden(),
+        then: v.forbidden(),
       }),
-    precision: joi
+    precision: v
       .when('type', {
         is: Types.NUMBER,
-        then: joi.number().integer().min(0).max(8),
+        then: v.number().integer().min(0).max(8),
       })
       .when('type', {
         not: Types.NUMBER,
-        then: joi.forbidden(),
+        then: v.forbidden(),
       }),
-    reference: joi
+    reference: v
       .when('type', {
         is: Types.REFERENCE,
-        then: joi.string().required(),
+        then: v.string().required(),
       })
       .when('items', {
         is: Types.REFERENCE,
-        then: joi.string().required(),
+        then: v.string().required(),
       }),
-    required: joi.boolean(),
-    unique: joi.boolean(),
-    default: joi.any(),
-    set: joi.any(),
-    get: joi.any(),
-    mutable: joi.boolean(),
-    ttl: joi
+    required: v.boolean(),
+    unique: v.boolean(),
+    default: v.any(),
+    set: v.any(),
+    get: v.any(),
+    mutable: v.boolean(),
+    dimensions: v
+      .when('type', {
+        is: Types.VECTOR,
+        then: v.number().integer().min(1).max(MAX_VECTOR_DIMENSIONS).required(),
+      })
+      .when('type', {
+        not: Types.VECTOR,
+        then: v.forbidden(),
+      }),
+    ttl: v
       .when('type', {
         not: Types.TIME,
-        then: joi.forbidden(),
+        then: v.forbidden(),
       })
       .when('type', {
         is: Types.TIME,
-        then: joi.number().positive().integer().min(5),
+        then: v.number().positive().integer().min(5),
       }),
-    triggerRemove: joi.when('type', {
+    triggerRemove: v.when('type', {
       is: Types.REFERENCE,
-      then: joi.boolean(),
-      otherwise: joi.any().when('type', {
+      then: v.boolean(),
+      otherwise: v.any().when('type', {
         is: Types.ARRAY,
-        then: joi.any().when('items', {
+        then: v.any().when('items', {
           is: Types.REFERENCE,
-          then: joi.boolean(),
-          otherwise: joi.forbidden(),
+          then: v.boolean(),
+          otherwise: v.forbidden(),
         }),
-        otherwise: joi.forbidden(),
+        otherwise: v.forbidden(),
       }),
     }),
   })
@@ -293,32 +326,32 @@ const schemaItem = joi
   .oxor('default', 'set', 'get')
   .min(1);
 
-const modelOptions = joi.object({
-  database: joi.string().required(),
-  collection: joi.string().required(),
-  name: joi.string().required(),
-  schema: joi.object().pattern(/^/, schemaItem).min(1),
-  dianaDb: joi.object(),
+const modelOptions = v.object({
+  database: v.string().required(),
+  collection: v.string().required(),
+  name: v.string().required(),
+  schema: v.object().pattern(/^/, schemaItem).min(1),
+  dianaDb: v.object(),
 });
 
-const projectionSchema = joi
+const projectionSchema = v
   .object({
-    $sum: joi.array().items(joi.number(), pointer),
-    $subtract: joi.array().items(joi.number(), pointer),
-    $divide: joi.array().items(joi.number().disallow(0), pointer),
-    $multiply: joi.array().items(joi.number(), pointer),
-    $ifNull: joi.array().items(joi.number(), pointer),
+    $sum: v.array().items(v.number(), pointer),
+    $subtract: v.array().items(v.number(), pointer),
+    $divide: v.array().items(v.number().disallow(0), pointer),
+    $multiply: v.array().items(v.number(), pointer),
+    $ifNull: v.array().items(v.number(), pointer),
     $max: pointer,
     $min: pointer,
     $avg: pointer,
-    $push: joi.any(),
-    $addToSet: joi.any(),
+    $push: v.any(),
+    $addToSet: v.any(),
     $concatArray: pointer,
     $first: pointer,
     $last: pointer,
-    $concat: joi.object({
-      delimiter: joi.string().required(),
-      parts: joi.array().items(joi.string()),
+    $concat: v.object({
+      delimiter: v.string().required(),
+      parts: v.array().items(v.string()),
     }),
     $year: pointer,
     $month: pointer,
@@ -329,50 +362,50 @@ const projectionSchema = joi
     $dayOfWeek: pointer,
     $dayOfYear: pointer,
     $timestamp: pointer,
-    $round: joi.number().integer().min(0).max(8),
+    $round: v.number().integer().min(0).max(8),
   })
   .min(1)
   .max(1);
 
-const transformQueries = joi.array().items(
-  joi
+const transformQueries = v.array().items(
+  v
     .object({
-      $lookup: joi.object({
-        collection: joi.string().required(),
-        database: joi.string(),
-        as: joi.string().required(),
-        localField: joi.string().required(),
-        foreignField: joi.string().required(),
-        filter: joi.any(),
+      $lookup: v.object({
+        collection: v.string().required(),
+        database: v.string(),
+        as: v.string().required(),
+        localField: v.string().required(),
+        foreignField: v.string().required(),
+        filter: v.any(),
         replaceRoot: pointer,
-        sort: joi.object().pattern(/^/, joi.number().integer().allow(-1, 1)).min(1),
-        skip: joi.number().positive().integer().allow(0),
-        limit: joi.number().positive().integer(),
+        sort: v.object().pattern(/^/, v.number().integer().allow(-1, 1)).min(1),
+        skip: v.number().positive().integer().allow(0),
+        limit: v.number().positive().integer(),
       }),
-      $match: joi
+      $match: v
         .object()
-        .pattern(/^/, joi.alternatives(booleanQuery, stringQuery, numberQuery, timeQuery, geoQuery, objectIdQuery)),
-      $sort: joi.object().pattern(/^/, joi.number().integer().allow(-1, 1)).min(1),
+        .pattern(/^/, v.alternatives(booleanQuery, stringQuery, numberQuery, timeQuery, geoQuery, objectIdQuery)),
+      $sort: v.object().pattern(/^/, v.number().integer().allow(-1, 1)).min(1),
       $unwind: pointer,
       $replaceRoot: pointer,
-      $group: joi
+      $group: v
         .object({
-          _id: joi.any().required(),
+          _id: v.any().required(),
         })
-        .pattern(/^(?!.*\_id$)/, joi.alternatives(projectionSchema, pointer, joi.boolean())),
-      $project: joi
+        .pattern(/^(?!.*\_id$)/, v.alternatives(projectionSchema, pointer, v.boolean())),
+      $project: v
         .object()
-        .pattern(/^/, joi.alternatives(projectionSchema, joi.string(), joi.boolean()))
+        .pattern(/^/, v.alternatives(projectionSchema, v.string(), v.boolean()))
         .min(1),
-      $skip: joi.number().positive().integer().allow(0),
-      $limit: joi.number().positive().integer(),
+      $skip: v.number().positive().integer().allow(0),
+      $limit: v.number().positive().integer(),
     })
     .max(1),
 );
 
-const sortQuery = joi.alternatives(
-  joi.number().integer().allow(-1, 1),
-  joi.object().pattern(/^/, joi.number().integer().allow(-1, 1)).min(1),
+const sortQuery = v.alternatives(
+  v.number().integer().allow(-1, 1),
+  v.object().pattern(/^/, v.number().integer().allow(-1, 1)).min(1),
 );
 
 export {
@@ -398,4 +431,6 @@ export {
   arrayOfGeoField,
   geoQuery,
   sortQuery,
+  vectorField,
+  vectorQuery,
 };

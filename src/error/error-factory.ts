@@ -3,15 +3,19 @@
  * - SERVER: the server rejected the request (validation, access, missing collection...); nothing was changed.
  * - DURABILITY: the server applied the change in memory but could not write it to its write-ahead log.
  *   The change is visible now and may be lost if the server crashes before its next snapshot.
+ * - MEMORY: the server is almost out of memory and refused the request; nothing was changed. It keeps refusing
+ *   requests (except removals) until memory is freed.
  * - TIMEOUT: no answer within the request timeout. The request may or may not have been applied.
  * - CONNECTION: not connected, or the connection closed before the answer. May or may not have been applied.
  */
-export type DianaDbErrorCode = 'SERVER' | 'DURABILITY' | 'TIMEOUT' | 'CONNECTION';
+export type DianaDbErrorCode = 'SERVER' | 'DURABILITY' | 'MEMORY' | 'TIMEOUT' | 'CONNECTION';
 
 export type DianaDbError = Error & { code: DianaDbErrorCode };
 
 // Prefix of the server's error text when the write-ahead log could not be written (server >= 2.x with WAL).
 const DURABILITY_ERROR_PREFIX: string = 'The change was applied but could not be written to disk';
+// Prefix of the server's error text while its memory is exhausted (server >= 3.4).
+const MEMORY_ERROR_PREFIX: string = '008 Memory Error';
 
 export class ErrorFactory {
   protected static construct(message: string) {
@@ -26,9 +30,13 @@ export class ErrorFactory {
 
   /** An error string returned by the server for one request. */
   public static serverError(message: string): DianaDbError {
-    return message.startsWith(DURABILITY_ERROR_PREFIX)
-      ? ErrorFactory.coded(`Durability Error: ${message}`, 'DURABILITY')
-      : ErrorFactory.coded(message, 'SERVER');
+    if (message.startsWith(DURABILITY_ERROR_PREFIX)) {
+      return ErrorFactory.coded(`Durability Error: ${message}`, 'DURABILITY');
+    }
+    if (message.startsWith(MEMORY_ERROR_PREFIX)) {
+      return ErrorFactory.coded(message, 'MEMORY');
+    }
+    return ErrorFactory.coded(message, 'SERVER');
   }
 
   public static connectionError(message: string): DianaDbError {

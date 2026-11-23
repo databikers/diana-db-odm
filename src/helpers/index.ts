@@ -4,3 +4,4 @@ export * from './event-key-helper';
 export * from './compare-schemas';
 export * from './parse-connection-string';
 export * from './random-id';
+export * from './json-parser';
