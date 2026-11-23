@@ -8,13 +8,13 @@ If you already know MongoDB, onboarding is quick — the query language is conce
 
 |                     |                                                                |
 | ------------------- | -------------------------------------------------------------- |
-| **Current release** | Server v3.0.0 / ODM v3.0.0                                     |
+| **Current release** | Server v4.0.0 / ODM v4.0.0                                     |
 | **ODM package**     | [`@diana-db/odm`](https://www.npmjs.com/package/@diana-db/odm) |
 | **Documentation**   | [diana-db.com](https://diana-db.com)                           |
 | **License**         | MIT with a usage restriction — see [License](#license)         |
 | **Maintainer**      | [Data Bikers Limited](https://databikers.com)                  |
 
-> Server >= 3.0.0 requires ODM >= 3.0.0.
+> Server >= 4.0.0 requires ODM >= 4.0.0.
 
 ---
 
@@ -265,6 +265,8 @@ diana-db create-backup -n test_backup
 | `ssl_reject_unauthorized`              | `DIANA_DB_SSL_REJECT_UNAUTHORIZED`      | Boolean (0/1) | Reject certificates that fail verification       |
 | `transactions_min_auto_rollback_value` | `DIANA_DB_TRANSACTION_AUTOROLLBACK_MIN` | Integer (ms)  | Minimum auto-rollback delay                      |
 | `transactions_max_auto_rollback_value` | `DIANA_DB_TRANSACTION_AUTOROLLBACK_MAX` | Integer (ms)  | Maximum auto-rollback delay                      |
+| `server_id`                            | `DIANA_DB_SERVER_ID`                    | String        | First part of new `_id`s (default: MAC address)  |
+| `memory_reserve_percent`               | `DIANA_DB_MEMORY_RESERVE_PERCENT`       | Integer 1–50  | Refuse requests below this free share (5)        |
 
 ```ini
 # /etc/diana-db/diana-db.conf
@@ -434,6 +436,7 @@ A schema is a configuration object describing the structure of stored documents.
 | `triggerRemove` | boolean                            | **REFERENCE only.** Remove this document when the referenced item is deleted    | No                                      | `false` |
 | `ttl`           | integer >= 5                       | **TIME only.** Time to live in ms from insertion                                | No                                      | –       |
 | `precision`     | integer 0–8                        | **NUMBER only.** Decimal places retained. Without it values are stored as given | No                                      | –       |
+| `dimensions`    | integer 1–65536                    | **VECTOR only.** Length of every vector; can't change while vectors are stored  | **Yes** (if VECTOR)                     | –       |
 
 Enforced exclusions:
 
@@ -443,16 +446,17 @@ Enforced exclusions:
 
 ### Field Types
 
-| Type              | Description                                  | Notes                                                              |
-| ----------------- | -------------------------------------------- | ------------------------------------------------------------------ |
-| `Types.STRING`    | String                                       | Supports `lowercase` / `uppercase`                                 |
-| `Types.NUMBER`    | Number                                       | Optional `precision` (fixed decimal places, e.g. money)            |
-| `Types.BOOLEAN`   | Boolean                                      | –                                                                  |
-| `Types.POSITION`  | `{ x, y }` point                             | Enables spatial queries                                            |
-| `Types.OBJECT_ID` | Hex string identifier                        | Not BSON. `/^[0-9a-f]{12}-[0-9a-f]{1,}-[0-9a-f]{11}-[0-9a-f]{9}$/` |
-| `Types.REFERENCE` | Like OBJECT_ID, linked to another collection | Requires `reference`. Enables `$subQuery`                          |
-| `Types.TIME`      | ISO 8601 string **or** epoch milliseconds    | Supports time filters and `ttl`                                    |
-| `Types.ARRAY`     | Homogeneous array of `items` type            | Any type as items. Set-like: unique values only                    |
+| Type              | Description                                  | Notes                                                            |
+| ----------------- | -------------------------------------------- | ---------------------------------------------------------------- |
+| `Types.STRING`    | String                                       | Supports `lowercase` / `uppercase`                               |
+| `Types.NUMBER`    | Number                                       | Optional `precision` (fixed decimal places, e.g. money)          |
+| `Types.BOOLEAN`   | Boolean                                      | –                                                                |
+| `Types.POSITION`  | `{ x, y }` point                             | Enables spatial queries                                          |
+| `Types.VECTOR`    | Numbers of length `dimensions` (embeddings)  | Similarity search: `$neighbors`, `$direction`. Not an ARRAY item |
+| `Types.OBJECT_ID` | `<server id>-<pid>-<timestamp>-<random>`     | Server id: MAC address or `server_id`. Not BSON                  |
+| `Types.REFERENCE` | Like OBJECT_ID, linked to another collection | Requires `reference`. Enables `$subQuery`                        |
+| `Types.TIME`      | ISO 8601 string **or** epoch milliseconds    | Supports time filters and `ttl`                                  |
+| `Types.ARRAY`     | Homogeneous array of `items` type            | Any type but VECTOR as items. Set-like: unique values only       |
 
 ```typescript
 import { Types, Schema } from '@diana-db/odm';
@@ -595,6 +599,49 @@ A TIME field is never compared directly. Each part operand takes a numeric query
 ```
 
 `$insideCircle` `$outsideCircle` `$insidePolygon` `$outsidePolygon` `$nearLines` `$farFromLines`. Polygons need at least 3 points; each line is exactly 2 points, at least one line. `$nearLines.distance` must be positive; `$farFromLines.distance` may be `0`.
+
+### Vector Queries
+
+```typescript
+const docModel = new Model({
+  database: 'test',
+  collection: 'doc',
+  name: 'Doc',
+  schema: { title: { type: Types.STRING }, embedding: { type: Types.VECTOR, dimensions: 3 } },
+});
+
+await docModel.find([
+  {
+    embedding: {
+      $neighbors: {
+        vector: [
+          0.12,
+          -0.5,
+          0.91,
+        ],
+        count: 5,
+        metric: 'cosine',
+      },
+    },
+  },
+]);
+await docModel.find([
+  {
+    embedding: {
+      $direction: {
+        vector: [
+          0.12,
+          -0.5,
+          0.91,
+        ],
+        minSimilarity: 0.8,
+      },
+    },
+  },
+]);
+```
+
+`$neighbors`: the `count` nearest vectors (default 10); `metric` is `euclidean` (default), `cosine` or `dot`; optional `maxDistance` (euclidean, cosine). `$direction`: cosine similarity of at least `minSimilarity` (-1 to 1), optional `count`. Results come closest first unless the query has a sort. The query vector must have the field's `dimensions`; the search is exact. Other fields in the same filter narrow the similarity result.
 
 ### Array and Reference Queries
 
@@ -857,6 +904,7 @@ Every failed request rejects with an `Error` that carries a `code`:
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SERVER`     | The server rejected the request (validation, access, unknown collection…). Nothing was changed                                                 |
 | `DURABILITY` | The change was applied but the server could not write it to its write-ahead log. It may be lost if the server crashes before the next snapshot |
+| `MEMORY`     | The server is almost out of memory and refused the request; nothing was changed. It refuses requests (except removals) until memory is freed   |
 | `TIMEOUT`    | No answer within `requestTimeoutValue`. The request may or may not have been applied                                                           |
 | `CONNECTION` | Not connected, or the connection closed before the answer. The request may or may not have been applied                                        |
 
@@ -918,7 +966,8 @@ Server and ODM versions are released in step and must be kept compatible.
 
 Recent highlights:
 
-- **v3.0.0** — core optimizations and refactoring
+- **v4.0.0** — vectors
+- **v3.3.3** — core optimizations and refactoring
 - **v2.5.3** — client-level database management (`createDatabase`, `removeDatabase`, `createCollection`, `removeCollection`), `replaceRoot` in `LookupQuery`, core optimizations
 - **v2.2.1** — `getVersion()`
 - **v2.1.3 / ODM 2.1.0** — `removeView`, `getViews`, `getCollectionViews`
