@@ -1,5 +1,6 @@
 export enum ClientAction {
   INSERT = 'insert',
+  INSERT_MANY = 'insertMany',
   FIND = 'find',
   FIND_BY_VIEW = 'findByView',
   COUNT_BY_VIEW = 'countByView',

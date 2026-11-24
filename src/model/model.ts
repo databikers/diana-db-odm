@@ -8,6 +8,11 @@ import { compareSchemas } from '@helper';
 import { ErrorFactory } from '@error';
 import { ProcessController } from '@controller';
 
+// Documents per insertMany request: large enough to amortize the round trip and the disk sync, small enough
+// that one request doesn't hold the server for long. The server accepts at most 10000.
+const INSERT_MANY_BATCH_SIZE: number = 1000;
+const MAX_INSERT_MANY_BATCH_SIZE: number = 10000;
+
 export class Model<T> {
   private static instances: Model<any>[] = [];
   private initialized: boolean;
@@ -49,6 +54,74 @@ export class Model<T> {
 
   public async insert(data: any, transactionId?: string): Promise<T & { _id: string }> {
     await this.ensureInitialized();
+    data = await this.prepareInsert(data);
+    const request: Partial<Request<T>> = {
+      database: this.options.database,
+      collection: this.options.collection,
+      action: ClientAction.INSERT,
+      setData: data,
+    };
+    if (transactionId) {
+      request.transactionId = transactionId;
+    }
+    return this.request(request);
+  }
+
+  /**
+   * Inserts many documents with one request (and one disk sync on the server) per `batchSize` documents.
+   *
+   * Every document is checked here before anything is sent. The server checks each batch as a whole: a batch
+   * with an invalid document or a repeated unique value inserts nothing. Batches are sent one after another,
+   * so when a later batch fails, the earlier ones are already stored; the error names the failing document by
+   * its position in `documents`. Use a transaction to make the whole call all-or-nothing.
+   */
+  public async insertMany(
+    documents: any[],
+    transactionId?: string,
+    batchSize: number = INSERT_MANY_BATCH_SIZE,
+  ): Promise<(T & { _id: string })[]> {
+    await this.ensureInitialized();
+    if (!Array.isArray(documents)) {
+      throw ErrorFactory.argumentError('insertMany expects an array of documents');
+    }
+    if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > MAX_INSERT_MANY_BATCH_SIZE) {
+      throw ErrorFactory.argumentError(`batchSize must be an integer from 1 to ${MAX_INSERT_MANY_BATCH_SIZE}`);
+    }
+    const prepared: any[] = [];
+    for (let i = 0; i < documents.length; i = i + 1) {
+      try {
+        prepared.push(await this.prepareInsert(documents[i]));
+      } catch (e) {
+        e.message = `document ${i}: ${e.message}`;
+        throw e;
+      }
+    }
+    const inserted: (T & { _id: string })[] = [];
+    for (let start = 0; start < prepared.length; start = start + batchSize) {
+      const request: Partial<Request<T>> = {
+        database: this.options.database,
+        collection: this.options.collection,
+        action: ClientAction.INSERT_MANY,
+        setData: prepared.slice(start, start + batchSize) as any,
+      };
+      if (transactionId) {
+        request.transactionId = transactionId;
+      }
+      try {
+        inserted.push(...(await this.request(request)));
+      } catch (e) {
+        // the server counts documents from the start of the batch
+        e.message = String(e.message).replace(/document (\d+):/, (_: string, index: string) => {
+          return `document ${start + Number(index)}:`;
+        });
+        throw e;
+      }
+    }
+    return inserted;
+  }
+
+  /** Copy of `data` with defaults and setters applied, checked against the schema. */
+  protected async prepareInsert(data: any): Promise<any> {
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw ErrorFactory.schemaError(`document should be an object`, 'stored document');
     }
@@ -76,16 +149,7 @@ export class Model<T> {
     }
     this.validator.requiredFields(data);
     this.validator.data(data);
-    const request: Partial<Request<T>> = {
-      database: this.options.database,
-      collection: this.options.collection,
-      action: ClientAction.INSERT,
-      setData: data,
-    };
-    if (transactionId) {
-      request.transactionId = transactionId;
-    }
-    return this.request(request);
+    return data;
   }
 
   public async createView(
