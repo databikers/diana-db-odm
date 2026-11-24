@@ -1,6 +1,9 @@
 import { Types, UnitOfTime, Weekday } from '@const';
 import { v } from './rules';
 
+/** Every _id a DianaDB server may have stored (see the server's helpers/object-id-helper). */
+export const OBJECT_ID_REGEXP: RegExp = /^(?:[A-Za-z0-9_]{1,64})?-[0-9a-f]{4,8}-[0-9a-f]{11}-[0-9a-f]{9}$/;
+
 const pointer = v.string().regex(/^\$[A-Za-z]+[A-Za-z0-9_]+/);
 
 const pemInput = v.alternatives(v.string(), v.binary());
@@ -55,8 +58,9 @@ const stringField = v.alternatives(
 );
 const objectIdField = v.alternatives(
   pointer,
-  // <server id: MAC address by default, or the server's server_id>-<pid>-<timestamp>-<random>
-  v.string().regex(/^[A-Za-z0-9_]{1,64}-[0-9a-f]{1,}-[0-9a-f]{11}-[0-9a-f]{9}$/),
+  // <server id>-<pid>-<timestamp>-<counter and random part>. Server 4.1+ makes server ids of exactly 12 lowercase
+  // letters or digits; _ids made by earlier versions (no server id, or 1-64 letters, digits or "_") are accepted too.
+  v.string().regex(OBJECT_ID_REGEXP),
 );
 
 const timeFieldItem = v.object({
