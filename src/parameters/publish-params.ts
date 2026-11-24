@@ -6,6 +6,9 @@ export type DatabaseUpdate = {
   collection: string;
   action: ClientAction.INSERT | ClientAction.UPDATE | ClientAction.REMOVE | `${ClientAction}`;
   affectedIds: string[];
-  /** Document snapshot, sent for inserts and updates. */
+  /**
+   * insert: the inserted document (for insertMany an array of them, left out above 100 documents).
+   * update: the update data as it was sent. Not sent for remove.
+   */
   data?: any;
 };
