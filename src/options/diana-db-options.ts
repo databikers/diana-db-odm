@@ -34,8 +34,8 @@ export type DianaDbOptions = {
   secureServer?: boolean;
   tls?: TlsOptions;
   /**
-   * Allow servers older than 4.1, which only know authentication protocol 1 (password hash used as the key, no
-   * salt). Default true: the client tries protocol 2 and falls back. Set false once every server is 4.1 or newer,
+   * Allow servers older than 4.6.5, which only know authentication protocol 1 (password hash used as the key, no
+   * salt). Default true: the client tries protocol 2 and falls back. Set false once every server is 4.6.5 or newer,
    * so the client never downgrades.
    */
   legacyAuth?: boolean;

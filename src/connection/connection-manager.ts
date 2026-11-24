@@ -14,7 +14,7 @@ export class ConnectionManager {
   // Requests issued while every pooled connection is reconnecting. Sent as soon as one is back, or failed
   // by their own timeout.
   private queue: Request<any>[] = [];
-  // authentication protocol of the server: 2 until a connection finds a server older than 4.1
+  // authentication protocol of the server: 2 until a connection finds a server older than 4.6.5
   public protocol: 1 | 2 = 2;
 
   constructor(options: DianaDbOptions) {

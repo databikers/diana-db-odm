@@ -1,7 +1,7 @@
 import { createHash, createHmac, hkdfSync, randomBytes, scrypt } from 'crypto';
 
 /**
- * Client side of authentication protocol 2 (server 4.1+). The server's helpers/scram describes the scheme:
+ * Client side of authentication protocol 2 (server 4.6.5+). The server's helpers/scram describes the scheme:
  * the password never leaves the client, the server proves it knows the user's record, and every connection
  * encrypts with its own session key.
  */

@@ -99,7 +99,7 @@ test(
       await db.connect(5000);
       assert.equal((await db.getVersion()).version, '4.0.0');
       await db.disconnect();
-      assert.ok(lines.some((line) => /is older than 4.1: using legacy authentication/.test(line)));
+      assert.ok(lines.some((line) => /is older than 4.6.5: using legacy authentication/.test(line)));
       assert.deepEqual(
         lines.filter((line) => line.startsWith('error')),
         [],
@@ -108,7 +108,7 @@ test(
       const strictClient = new DianaDb(old.options({ legacyAuth: false, logger }));
       await assert.rejects(
         strictClient.connect(5000),
-        /does not support authentication protocol 2 \(server before 4.1\) and legacyAuth is false/,
+        /does not support authentication protocol 2 \(server before 4.6.5\) and legacyAuth is false/,
       );
     } finally {
       await old.stop();

@@ -8,13 +8,13 @@ If you already know MongoDB, onboarding is quick — the query language is conce
 
 |                     |                                                                |
 | ------------------- | -------------------------------------------------------------- |
-| **Current release** | Server v4.1.0 / ODM v4.1.0                                     |
+| **Current release** | Server v4.6.5 / ODM v4.6.5                                     |
 | **ODM package**     | [`@diana-db/odm`](https://www.npmjs.com/package/@diana-db/odm) |
 | **Documentation**   | [diana-db.com](https://diana-db.com)                           |
 | **License**         | MIT with a usage restriction — see [License](#license)         |
 | **Maintainer**      | [Data Bikers Limited](https://databikers.com)                  |
 
-> Server >= 4.0.0 requires ODM >= 4.0.0. Server 4.1 and ODM 4.1 work with the 4.0 releases of the other side: see [Security](#security).
+> Server >= 4.0.0 requires ODM >= 4.0.0. Server 4.6.5 and ODM 4.6.5 work with the 4.0 releases of the other side: see [Security](#security).
 
 ---
 
@@ -271,7 +271,7 @@ diana-db create-backup -n test_backup
 | `transactions_min_auto_rollback_value` | `DIANA_DB_TRANSACTION_AUTOROLLBACK_MIN` | Integer (ms)  | Minimum auto-rollback delay                                                             |
 | `transactions_max_auto_rollback_value` | `DIANA_DB_TRANSACTION_AUTOROLLBACK_MAX` | Integer (ms)  | Maximum auto-rollback delay                                                             |
 | `server_id`                            | `DIANA_DB_SERVER_ID`                    | String        | First part of new `_id`s: exactly 12 lowercase letters or digits (default: MAC address) |
-| `legacy_auth`                          | `DIANA_DB_LEGACY_AUTH`                  | Boolean       | Accept clients older than 4.1 (default `yes`)                                           |
+| `legacy_auth`                          | `DIANA_DB_LEGACY_AUTH`                  | Boolean       | Accept clients older than 4.6.5 (default `yes`)                                         |
 | `http`                                 | `DIANA_DB_HTTP`                         | Boolean       | HTTP server for monitoring (default `yes`)                                              |
 | `http_port`                            | `DIANA_DB_HTTP_PORT`                    | Integer       | Its port (default `34568`)                                                              |
 | `http_host`                            | `DIANA_DB_HTTP_HOST`                    | String        | Its address (default `127.0.0.1`)                                                       |
@@ -313,11 +313,11 @@ store_strategy=local
 
 > Passwords are never sent over the wire, but connection metadata is sent in plaintext at connection start. Enable TLS if metadata confidentiality matters.
 
-**Upgrading from 4.0.** The handshake above is protocol 2, new in 4.1. Both sides still speak the 4.0 protocol:
+**Upgrading from 4.0.** The handshake above is protocol 2, new in 4.6.5. Both sides still speak the 4.0 protocol:
 
-- ODM 4.1 falls back to it when the server is older than 4.1. Pass `legacyAuth: false` (or `?legacyAuth=false`) to refuse that.
-- Server 4.1 accepts 4.0 clients while `legacy_auth` is on (the default). Users created before 4.1 work with both protocols without any change.
-- When every client is on 4.1, set `legacy_auth=no`.
+- ODM 4.6.5 falls back to it when the server is older than 4.6.5. Pass `legacyAuth: false` (or `?legacyAuth=false`) to refuse that.
+- Server 4.6.5 accepts 4.0 clients while `legacy_auth` is on (the default). Users created before 4.6.5 work with both protocols without any change.
+- When every client is on 4.6.5, set `legacy_auth=no`.
 
 ---
 
@@ -442,7 +442,7 @@ You can create as many instances as you like — each has its own migrations and
 | `legacyAuth`            | boolean                                                  | `true`    | –            |
 | `logger`                | object                                                   | `console` | –            |
 
-- `legacyAuth: false` refuses servers older than 4.1 instead of falling back to their handshake (see [Security](#security)). Also accepted as `?legacyAuth=false` in a connection string.
+- `legacyAuth: false` refuses servers older than 4.6.5 instead of falling back to their handshake (see [Security](#security)). Also accepted as `?legacyAuth=false` in a connection string.
 - `database` is used by `migrateUp`, `migrateDown` and `getMigrations` when they are called without one.
 - `tls` values are Buffers (`readFileSync`) or PEM strings; `ca` may be an array. Other Node.js `tls.connect` options pass through. `cert`/`key` are only needed when the server verifies clients (mTLS).
 - `rejectUnauthorized` defaults to `false`, so self-signed servers work out of the box. **Set it to `true` with `ca` in production**: the certificate is then checked against `host` (or `servername`), so connect by the name in the certificate, not by IP.
@@ -627,7 +627,7 @@ const users = await userModel.insertMany([
 await userModel.insertMany(documents, transactionId, 5000);
 ```
 
-It returns the inserted documents in the given order. A batch is inserted completely or not at all: if one document is invalid, the error names its position and nothing of that batch is stored. Batches already sent stay inserted, so use a transaction when all documents must be stored together. Requires server 4.1 or newer.
+It returns the inserted documents in the given order. A batch is inserted completely or not at all: if one document is invalid, the error names its position and nothing of that batch is stored. Batches already sent stay inserted, so use a transaction when all documents must be stored together. Requires server 4.6.5 or newer.
 
 ---
 
@@ -1053,7 +1053,7 @@ Server and ODM versions are released in step and must be kept compatible.
 
 Recent highlights:
 
-- **v4.1.0** — `insertMany`, salted challenge-response authentication (protocol 2), HTTP `/health` and `/metrics`, multi-master replication, strict `server_id`, shorter pauses while snapshots are saved
+- **v4.6.5** — `insertMany`, salted challenge-response authentication (protocol 2), HTTP `/health` and `/metrics`, multi-master replication, strict `server_id`, shorter pauses while snapshots are saved
 - **v4.0.0** — vectors
 - **v3.3.3** — core optimizations and refactoring
 - **v2.5.3** — client-level database management (`createDatabase`, `removeDatabase`, `createCollection`, `removeCollection`), `replaceRoot` in `LookupQuery`, core optimizations

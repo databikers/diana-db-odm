@@ -59,7 +59,7 @@ const stringField = v.alternatives(
 );
 const objectIdField = v.alternatives(
   pointer,
-  // <server id>-<pid>-<timestamp>-<counter and random part>. Server 4.1+ makes server ids of exactly 12 lowercase
+  // <server id>-<pid>-<timestamp>-<counter and random part>. Server 4.6.5+ makes server ids of exactly 12 lowercase
   // letters or digits; _ids made by earlier versions (no server id, or 1-64 letters, digits or "_") are accepted too.
   v.string().regex(OBJECT_ID_REGEXP),
 );

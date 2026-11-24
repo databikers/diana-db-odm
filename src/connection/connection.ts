@@ -15,7 +15,7 @@ const EARLY_CLOSE_MS: number = 2000;
  *
  * Wire format, both directions: one line per message, terminated by "\n".
  *
- * Protocol 2 (server 4.1+): a challenge-response handshake (helpers/scram), then every line is
+ * Protocol 2 (server 4.6.5+): a challenge-response handshake (helpers/scram), then every line is
  * base64(AES-256-GCM(session key, JSON)) with a key of its own per connection:
  *   client "hello:2:<user>:<nonce>[:subscriber]"  server "challenge:2:..."  client "proof:..."  server "ok:2:..."
  *
@@ -270,16 +270,16 @@ export class Connection {
     this.partsLength = 0;
     this.sessionKey = undefined;
     if (this.started && this.protocol === 2 && stage === 'hello' && this.activeSocket) {
-      // Closed after "hello" without a challenge: a server before 4.1, which can't read the line.
+      // Closed after "hello" without a challenge: a server before 4.6.5, which can't read the line.
       if (this.options.legacyAuth === false) {
         this.authenticationFailed(
           socket,
-          'the server does not support authentication protocol 2 (server before 4.1) and legacyAuth is false',
+          'the server does not support authentication protocol 2 (server before 4.6.5) and legacyAuth is false',
         );
       } else {
         this.protocol = 1;
         this.options.logger.log(
-          `DianaDB server ${this.options.host}:${this.options.port} is older than 4.1: using legacy authentication ` +
+          `DianaDB server ${this.options.host}:${this.options.port} is older than 4.6.5: using legacy authentication ` +
             '(upgrade the server, then set legacyAuth: false)',
         );
         this.open();
