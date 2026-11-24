@@ -176,7 +176,7 @@ export class Connection {
       for (const id of ids) {
         this.options.connectionManager?.controller?.failRequest(id, reason, 'CONNECTION');
       }
-    } else if (wasConnected && !this.receivedResponse && Date.now() - this.readyAt < EARLY_CLOSE_MS) {
+    } else if (this.started && wasConnected && !this.receivedResponse && Date.now() - this.readyAt < EARLY_CLOSE_MS) {
       this.options.logger.error(
         new Error(
           `DianaDB server ${this.options.host}:${this.options.port} closed the connection right after the handshake: ` +
