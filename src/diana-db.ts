@@ -301,6 +301,7 @@ export class DianaDb {
         reconnectTimeoutValue: this.options.reconnectTimeoutValue,
         secureServer: this.options.secureServer,
         tls: this.options.tls,
+        legacyAuth: this.options.legacyAuth,
         isSubscriber: true,
       });
       this.subscribersConnection = connection;

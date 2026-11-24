@@ -35,6 +35,9 @@ export function parseConnectionString(connectionString: string): DianaDbOptions 
   if (database) {
     options.database = database;
   }
+  if (params.has('legacyAuth')) {
+    options.legacyAuth = params.get('legacyAuth') !== 'false';
+  }
   if (secureServer && params.has('rejectUnauthorized')) {
     options.tls = { rejectUnauthorized: params.get('rejectUnauthorized') === 'true' };
   }

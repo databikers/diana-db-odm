@@ -19,6 +19,7 @@ export const clientOptions = v.object({
   requestTimeoutValue: v.number().positive().integer().min(1),
   database: v.string(),
   secureServer: v.boolean(),
+  legacyAuth: v.boolean(),
   logger: v.any(),
   // Buffers, as in the README (readFileSync), or PEM strings. Other node tls options pass through.
   tls: v

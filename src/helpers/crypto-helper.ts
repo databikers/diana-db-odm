@@ -49,4 +49,29 @@ export class CryptoHelper {
       decipher.final(),
     ]).toString();
   }
+
+  /** With a ready key (a protocol 2 session key) instead of a password. */
+  public static encryptWithKey(key: Buffer, plaintext: string) {
+    const iv = crypto.randomBytes(IV_LEN);
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+    const ciphertext = Buffer.concat([
+      cipher.update(plaintext),
+      cipher.final(),
+    ]);
+    return Buffer.concat([
+      iv,
+      cipher.getAuthTag(),
+      ciphertext,
+    ]).toString('base64');
+  }
+
+  public static decryptWithKey(key: Buffer, text: string) {
+    const encrypted = Buffer.from(text, 'base64');
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, encrypted.subarray(0, IV_LEN));
+    decipher.setAuthTag(encrypted.subarray(IV_LEN, IV_LEN + TAG_LEN));
+    return Buffer.concat([
+      decipher.update(encrypted.subarray(IV_LEN + TAG_LEN)),
+      decipher.final(),
+    ]).toString();
+  }
 }

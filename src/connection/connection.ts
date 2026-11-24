@@ -2,7 +2,7 @@ import { isIP, Socket } from 'net';
 import { connect as tlsConnect, TLSSocket } from 'tls';
 
 import { ConnectOptions } from '@options';
-import { CryptoHelper, parseJson } from '@helper';
+import { Challenge, clientNonce, CryptoHelper, parseChallenge, parseJson, Proof, prove } from '@helper';
 import { Request } from '@dto';
 
 // Largest response line accepted from the server (base64). Protects memory from a line that never ends.
@@ -14,6 +14,12 @@ const EARLY_CLOSE_MS: number = 2000;
  * One TCP (or TLS) connection to a DianaDB server.
  *
  * Wire format, both directions: one line per message, terminated by "\n".
+ *
+ * Protocol 2 (server 4.1+): a challenge-response handshake (helpers/scram), then every line is
+ * base64(AES-256-GCM(session key, JSON)) with a key of its own per connection:
+ *   client "hello:2:<user>:<nonce>[:subscriber]"  server "challenge:2:..."  client "proof:..."  server "ok:2:..."
+ *
+ * Protocol 1 (older servers, used only when `legacyAuth` allows it):
  *   - first client line: "user:<name>" or "user:<name>:subscriber:<token>"
  *   - every other line: base64(AES-256-GCM(sha256(password), JSON))
  */
@@ -33,6 +39,13 @@ export class Connection {
   private readyAt: number = 0;
   private receivedResponse: boolean = false;
   private onReady: () => void;
+  private onFailed: (error: Error) => void;
+  // handshake progress of the current socket: protocol 2 goes hello -> proof -> ready, protocol 1 is ready at once
+  private stage: 'hello' | 'proof' | 'ready' = 'hello';
+  private nonce: string;
+  private proof: Proof;
+  private sessionKey: Buffer;
+  private ownProtocol: 1 | 2 = 2;
 
   constructor(options: ConnectOptions) {
     this.options = options;
@@ -49,16 +62,37 @@ export class Connection {
     return Boolean(this.options.isSubscriber);
   }
 
+  // Shared by the pool: once one connection finds an older server, the others don't try protocol 2 again.
+  private get protocol(): 1 | 2 {
+    return this.options.connectionManager?.protocol ?? this.ownProtocol;
+  }
+
+  private set protocol(value: 1 | 2) {
+    this.ownProtocol = value;
+    if (this.options.connectionManager) {
+      this.options.connectionManager.protocol = value;
+    }
+  }
+
   public connect(connectTimeoutValue: number): Promise<void> {
     this.started = true;
     return new Promise<void>((resolve, reject) => {
       const connectTimeout = setTimeout(() => {
         this.onReady = undefined;
+        this.onFailed = undefined;
         reject(new Error(`Connect timeout exceeded for ${this.options.host}:${this.options.port}`));
       }, connectTimeoutValue);
       this.onReady = () => {
         clearTimeout(connectTimeout);
+        this.onFailed = undefined;
         resolve();
+      };
+      // authentication refused: fail now instead of waiting for the timeout
+      this.onFailed = (error: Error) => {
+        clearTimeout(connectTimeout);
+        this.onReady = undefined;
+        this.onFailed = undefined;
+        reject(error);
       };
       this.open();
     });
@@ -68,6 +102,7 @@ export class Connection {
   public disconnect(): Promise<void> {
     this.started = false;
     this.onReady = undefined;
+    this.onFailed = undefined;
     clearTimeout(this.reconnectTimer);
     const socket: Socket = this.socket;
     if (!socket || socket.destroyed) {
@@ -86,7 +121,7 @@ export class Connection {
     }
     request.requestGroupId = this.options.requestGroupId;
     this.inFlight.add(request.clientRequestId);
-    this.activeSocket.write(CryptoHelper.encrypt(this.options.password, JSON.stringify(request)) + '\n');
+    this.activeSocket.write(this.encrypt(JSON.stringify(request)) + '\n');
   }
 
   private open() {
@@ -95,6 +130,9 @@ export class Connection {
     this.parts = [];
     this.partsLength = 0;
     this.receivedResponse = false;
+    this.stage = 'hello';
+    this.proof = undefined;
+    this.sessionKey = undefined;
     socket.setNoDelay(true);
     socket.setKeepAlive(true, 10000);
 
@@ -135,7 +173,17 @@ export class Connection {
     this.activeSocket = socket;
     socket.setEncoding('utf8');
     socket.on('data', (chunk: string) => this.onData(chunk));
-    socket.write(this.handshake() + '\n');
+    if (this.protocol === 1) {
+      socket.write(this.legacyHandshake() + '\n');
+      this.ready();
+      return;
+    }
+    this.nonce = clientNonce();
+    socket.write(`hello:2:${this.options.user}:${this.nonce}${this.options.isSubscriber ? ':subscriber' : ''}\n`);
+  }
+
+  private ready() {
+    this.stage = 'ready';
     this._connected = true;
     this.readyAt = Date.now();
     const onReady = this.onReady;
@@ -144,8 +192,63 @@ export class Connection {
     this.options.connectionManager?.onConnectionReady(this);
   }
 
+  private encrypt(text: string): string {
+    return this.sessionKey
+      ? CryptoHelper.encryptWithKey(this.sessionKey, text)
+      : CryptoHelper.encrypt(this.options.password, text);
+  }
+
+  private decrypt(text: string): string {
+    return this.sessionKey
+      ? CryptoHelper.decryptWithKey(this.sessionKey, text)
+      : CryptoHelper.decrypt(this.options.password, text);
+  }
+
+  /** Protocol 2 lines before the session starts: the challenge, then the server's signature. */
+  private onHandshakeLine(line: string, socket: Socket): void {
+    if (this.stage === 'hello') {
+      const challenge: Challenge | undefined = parseChallenge(line);
+      if (!challenge) {
+        this.authenticationFailed(socket, `unexpected answer to the handshake from the DianaDB server`);
+        return;
+      }
+      this.stage = 'proof';
+      prove(this.options.user, this.options.password, this.nonce, challenge).then(
+        (proof: Proof) => {
+          if (socket !== this.socket || socket.destroyed) {
+            return;
+          }
+          this.proof = proof;
+          this.activeSocket.write(`proof:${proof.proof}\n`);
+        },
+        (error: Error) => this.authenticationFailed(socket, `could not compute the proof: ${error.message}`),
+      );
+      return;
+    }
+    if (!this.proof || line !== `ok:2:${this.proof.expectedSignature}`) {
+      // the server doesn't know the user's record: it is not the server the client thinks it is
+      this.authenticationFailed(
+        socket,
+        `the DianaDB server failed to prove that it knows the user "${this.options.user}"`,
+      );
+      return;
+    }
+    this.sessionKey = this.proof.key;
+    this.proof = undefined;
+    this.ready();
+  }
+
+  private authenticationFailed(socket: Socket, reason: string) {
+    const error: Error = new Error(`Authentication with ${this.options.host}:${this.options.port} failed: ${reason}`);
+    this.options.logger.error(error);
+    const onFailed = this.onFailed;
+    this.onFailed = undefined;
+    onFailed?.(error);
+    socket.destroy();
+  }
+
   /** "user:<name>" for requests; subscribers add a token that proves they know the password. */
-  private handshake(): string {
+  private legacyHandshake(): string {
     const { user, password } = this.options;
     if (!this.options.isSubscriber) {
       return `user:${user}`;
@@ -161,9 +264,30 @@ export class Connection {
       return;
     }
     const wasConnected: boolean = this._connected;
+    const stage: 'hello' | 'proof' | 'ready' = this.stage;
     this._connected = false;
     this.parts = [];
     this.partsLength = 0;
+    this.sessionKey = undefined;
+    if (this.started && this.protocol === 2 && stage === 'hello' && this.activeSocket) {
+      // Closed after "hello" without a challenge: a server before 4.1, which can't read the line.
+      if (this.options.legacyAuth === false) {
+        this.authenticationFailed(
+          socket,
+          'the server does not support authentication protocol 2 (server before 4.1) and legacyAuth is false',
+        );
+      } else {
+        this.protocol = 1;
+        this.options.logger.log(
+          `DianaDB server ${this.options.host}:${this.options.port} is older than 4.1: using legacy authentication ` +
+            '(upgrade the server, then set legacyAuth: false)',
+        );
+        this.open();
+        return;
+      }
+    } else if (this.started && stage === 'proof') {
+      this.authenticationFailed(socket, 'check the user name and password');
+    }
     if (this.inFlight.size) {
       const rejectedEarly: boolean = !this.receivedResponse && Date.now() - this.readyAt < EARLY_CLOSE_MS;
       const reason: string = rejectedEarly
@@ -225,10 +349,14 @@ export class Connection {
   }
 
   private processLine(line: string): boolean {
+    if (this.stage !== 'ready') {
+      this.onHandshakeLine(line, this.socket);
+      return !this.socket.destroyed;
+    }
     let response: any;
     try {
       // same hardening as the server: prototype keys dropped, nesting limited to 256 levels
-      response = parseJson(CryptoHelper.decrypt(this.options.password, line));
+      response = parseJson(this.decrypt(line));
     } catch (e) {
       // A complete line that does not decrypt means a wrong password or a corrupted stream. Buffering it would
       // poison every following response, so drop the connection and let it reconnect cleanly.

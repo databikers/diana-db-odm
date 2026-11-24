@@ -14,6 +14,8 @@ export class ConnectionManager {
   // Requests issued while every pooled connection is reconnecting. Sent as soon as one is back, or failed
   // by their own timeout.
   private queue: Request<any>[] = [];
+  // authentication protocol of the server: 2 until a connection finds a server older than 4.1
+  public protocol: 1 | 2 = 2;
 
   constructor(options: DianaDbOptions) {
     this.options = options;
@@ -50,6 +52,7 @@ export class ConnectionManager {
         connectionManager: this,
         secureServer: this.options.secureServer,
         tls: this.options.tls,
+        legacyAuth: this.options.legacyAuth,
       });
       this.connections.push(connection);
     }
@@ -59,14 +62,19 @@ export class ConnectionManager {
   public async connect(connectTimeoutValue: number): Promise<void> {
     await Promise.all(this.connections.map((connection: Connection) => connection.disconnect()));
     this.connections = [];
+    this.protocol = 2;
     this.setupConnections();
     this.started = true;
     try {
       await Promise.any(this.connections.map((connection: Connection) => connection.connect(connectTimeoutValue)));
-    } catch {
+    } catch (e) {
       await this.disconnect(false);
+      const reasons: Error[] = e instanceof AggregateError ? e.errors : [];
+      const refused: Error | undefined = reasons.find((reason: Error) => /^Authentication with /.test(reason?.message));
       throw ErrorFactory.connectionError(
-        `Connection to the DianaDb Server ${this.options.host}:${this.options.port} was rejected by timeout (${connectTimeoutValue} ms).`,
+        refused
+          ? refused.message
+          : `Connection to the DianaDb Server ${this.options.host}:${this.options.port} was rejected by timeout (${connectTimeoutValue} ms).`,
       );
     }
     eventEmitter.emit(CONNECT_EVENT);
