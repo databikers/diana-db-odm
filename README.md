@@ -8,13 +8,13 @@ If you already know MongoDB, onboarding is quick — the query language is conce
 
 |                     |                                                                |
 | ------------------- | -------------------------------------------------------------- |
-| **Current release** | Server v4.0.0 / ODM v4.0.0                                     |
+| **Current release** | Server v4.1.0 / ODM v4.1.0                                     |
 | **ODM package**     | [`@diana-db/odm`](https://www.npmjs.com/package/@diana-db/odm) |
 | **Documentation**   | [diana-db.com](https://diana-db.com)                           |
 | **License**         | MIT with a usage restriction — see [License](#license)         |
 | **Maintainer**      | [Data Bikers Limited](https://databikers.com)                  |
 
-> Server >= 4.0.0 requires ODM >= 4.0.0.
+> Server >= 4.0.0 requires ODM >= 4.0.0. Server 4.1 and ODM 4.1 work with the 4.0 releases of the other side: see [Security](#security).
 
 ---
 
@@ -29,6 +29,8 @@ If you already know MongoDB, onboarding is quick — the query language is conce
 - [CLI Tool](#cli-tool)
 - [Configuration](#configuration)
 - [Security](#security)
+- [Monitoring](#monitoring)
+- [Replication](#replication)
 - [Desktop Application](#desktop-application)
 - [ODM for Node.js](#odm-for-nodejs)
   - [Connecting](#connecting)
@@ -78,6 +80,9 @@ If you already know MongoDB, onboarding is quick — the query language is conce
 | **ACID transactions**          | Multi-document transactions with document-level locking                               |
 | **Built-in migration storage** | Track and apply migrations with no extra tooling or external migration table          |
 | **S3 sync**                    | Store dumps and backups directly in a private, S3-compatible bucket                   |
+| **Vectors**                    | Store embeddings and search by distance or direction                                  |
+| **Multi-master replication**   | Several servers hold the same data, and each of them accepts writes                   |
+| **Monitoring**                 | `/health` and Prometheus `/metrics` over HTTP                                         |
 
 Relations work without JOINs or explicit lookups. Given `user` and `post` collections, you can retrieve every post by a user named "John Doe" directly — and every post by users belonging to a specific team, even when the post stores only the user id and the user stores only the team id.
 
@@ -243,30 +248,41 @@ diana-db create-backup -n test_backup
 
 `diana-db` reads a `key=value` config, defaulting to `/etc/diana-db/diana-db.conf`. Each key maps to an environment variable used by `diana-db-server`. Comments start with `#`.
 
-| Key                                    | Environment Variable                    | Type          | Description                                      |
-| -------------------------------------- | --------------------------------------- | ------------- | ------------------------------------------------ |
-| `port`                                 | `DIANA_DB_PORT`                         | Integer       | Listening TCP port (default `34567`)             |
-| `dump_create_interval`                 | `DIANA_DB_DUMP_CREATE_INTERVAL`         | Integer (ms)  | How often to snapshot                            |
-| `logs_directory`                       | `DIANA_DB_LOG_DIRECTORY`                | Path          | Server log directory                             |
-| `dump_directory`                       | `DIANA_DB_DUMP_DIRECTORY`               | Path          | Dump directory                                   |
-| `logs_ttl_value`                       | `DIANA_DB_LOG_TTL`                      | Integer (ms)  | Log retention                                    |
-| `backup_name`                          | `DIANA_DB_BACKUP_NAME`                  | String        | Default backup filename when `-n` is omitted     |
-| `current_dump_name`                    | `DIANA_DB_DUMP_CURRENT_NAME`            | String        | Filename for the latest dump                     |
-| `store_strategy`                       | `DIANA_DB_STORE_STRATEGY`               | String        | `local` (default) or `s3`                        |
-| `store_s3_endpoint`                    | `DIANA_DB_STORE_S3_ENDPOINT`            | URL           | Required when `store_strategy=s3`                |
-| `store_s3_bucket`                      | `DIANA_DB_STORE_S3_BUCKET`              | String        | Required when `store_strategy=s3`                |
-| `store_s3_region`                      | `DIANA_DB_STORE_S3_REGION`              | String        | Required when `store_strategy=s3`                |
-| `store_s3_access_key_id`               | `DIANA_DB_STORE_S3_ACCESS_KEY_ID`       | String        | Required when `store_strategy=s3`                |
-| `store_s3_secret_access_key`           | `DIANA_DB_STORE_S3_SECRET_ACCESS_KEY`   | String        | Required when `store_strategy=s3`                |
-| `ssl_cert_file`                        | `DIANA_DB_SSL_CERT_FILE`                | Path          | TLS certificate. Enables TLS with `ssl_key_file` |
-| `ssl_key_file`                         | `DIANA_DB_SSL_KEY_FILE`                 | Path          | TLS private key                                  |
-| `ssl_ca_file`                          | `DIANA_DB_SSL_CA_FILE`                  | Path          | CA used to verify client certificates (mTLS)     |
-| `ssl_request_cert`                     | `DIANA_DB_SSL_REQUEST_CERT`             | Boolean (0/1) | Request a client certificate (mTLS)              |
-| `ssl_reject_unauthorized`              | `DIANA_DB_SSL_REJECT_UNAUTHORIZED`      | Boolean (0/1) | Reject certificates that fail verification       |
-| `transactions_min_auto_rollback_value` | `DIANA_DB_TRANSACTION_AUTOROLLBACK_MIN` | Integer (ms)  | Minimum auto-rollback delay                      |
-| `transactions_max_auto_rollback_value` | `DIANA_DB_TRANSACTION_AUTOROLLBACK_MAX` | Integer (ms)  | Maximum auto-rollback delay                      |
-| `server_id`                            | `DIANA_DB_SERVER_ID`                    | String        | First part of new `_id`s (default: MAC address)  |
-| `memory_reserve_percent`               | `DIANA_DB_MEMORY_RESERVE_PERCENT`       | Integer 1–50  | Refuse requests below this free share (5)        |
+| Key                                    | Environment Variable                    | Type          | Description                                                                             |
+| -------------------------------------- | --------------------------------------- | ------------- | --------------------------------------------------------------------------------------- |
+| `port`                                 | `DIANA_DB_PORT`                         | Integer       | Listening TCP port (default `34567`)                                                    |
+| `dump_create_interval`                 | `DIANA_DB_DUMP_CREATE_INTERVAL`         | Integer (ms)  | How often to snapshot                                                                   |
+| `logs_directory`                       | `DIANA_DB_LOG_DIRECTORY`                | Path          | Server log directory                                                                    |
+| `dump_directory`                       | `DIANA_DB_DUMP_DIRECTORY`               | Path          | Dump directory                                                                          |
+| `logs_ttl_value`                       | `DIANA_DB_LOG_TTL`                      | Integer (ms)  | Log retention                                                                           |
+| `backup_name`                          | `DIANA_DB_BACKUP_NAME`                  | String        | Default backup filename when `-n` is omitted                                            |
+| `current_dump_name`                    | `DIANA_DB_DUMP_CURRENT_NAME`            | String        | Filename for the latest dump                                                            |
+| `store_strategy`                       | `DIANA_DB_STORE_STRATEGY`               | String        | `local` (default) or `s3`                                                               |
+| `store_s3_endpoint`                    | `DIANA_DB_STORE_S3_ENDPOINT`            | URL           | Required when `store_strategy=s3`                                                       |
+| `store_s3_bucket`                      | `DIANA_DB_STORE_S3_BUCKET`              | String        | Required when `store_strategy=s3`                                                       |
+| `store_s3_region`                      | `DIANA_DB_STORE_S3_REGION`              | String        | Required when `store_strategy=s3`                                                       |
+| `store_s3_access_key_id`               | `DIANA_DB_STORE_S3_ACCESS_KEY_ID`       | String        | Required when `store_strategy=s3`                                                       |
+| `store_s3_secret_access_key`           | `DIANA_DB_STORE_S3_SECRET_ACCESS_KEY`   | String        | Required when `store_strategy=s3`                                                       |
+| `ssl_cert_file`                        | `DIANA_DB_SSL_CERT_FILE`                | Path          | TLS certificate. Enables TLS with `ssl_key_file`                                        |
+| `ssl_key_file`                         | `DIANA_DB_SSL_KEY_FILE`                 | Path          | TLS private key                                                                         |
+| `ssl_ca_file`                          | `DIANA_DB_SSL_CA_FILE`                  | Path          | CA used to verify client certificates (mTLS)                                            |
+| `ssl_request_cert`                     | `DIANA_DB_SSL_REQUEST_CERT`             | Boolean (0/1) | Request a client certificate (mTLS)                                                     |
+| `ssl_reject_unauthorized`              | `DIANA_DB_SSL_REJECT_UNAUTHORIZED`      | Boolean (0/1) | Reject certificates that fail verification                                              |
+| `transactions_min_auto_rollback_value` | `DIANA_DB_TRANSACTION_AUTOROLLBACK_MIN` | Integer (ms)  | Minimum auto-rollback delay                                                             |
+| `transactions_max_auto_rollback_value` | `DIANA_DB_TRANSACTION_AUTOROLLBACK_MAX` | Integer (ms)  | Maximum auto-rollback delay                                                             |
+| `server_id`                            | `DIANA_DB_SERVER_ID`                    | String        | First part of new `_id`s: exactly 12 lowercase letters or digits (default: MAC address) |
+| `legacy_auth`                          | `DIANA_DB_LEGACY_AUTH`                  | Boolean       | Accept clients older than 4.1 (default `yes`)                                           |
+| `http`                                 | `DIANA_DB_HTTP`                         | Boolean       | HTTP server for monitoring (default `yes`)                                              |
+| `http_port`                            | `DIANA_DB_HTTP_PORT`                    | Integer       | Its port (default `34568`)                                                              |
+| `http_host`                            | `DIANA_DB_HTTP_HOST`                    | String        | Its address (default `127.0.0.1`)                                                       |
+| `http_token`                           | `DIANA_DB_HTTP_TOKEN`                   | String        | Require `Authorization: Bearer <token>` (16+ characters)                                |
+| `cluster_peers`                        | `DIANA_DB_CLUSTER_PEERS`                | String        | Other servers of the cluster: `host:port,host:port`                                     |
+| `cluster_secret`                       | `DIANA_DB_CLUSTER_SECRET`               | String        | Shared by all servers of the cluster (16+ characters)                                   |
+| `cluster_port`                         | `DIANA_DB_CLUSTER_PORT`                 | Integer       | Port for the other servers (default `34569`)                                            |
+| `cluster_host`                         | `DIANA_DB_CLUSTER_HOST`                 | String        | Its address (default `0.0.0.0`)                                                         |
+| `cluster_tombstone_ttl`                | `DIANA_DB_CLUSTER_TOMBSTONE_TTL`        | `7d`, `48h`   | How long removals are remembered (default `7d`)                                         |
+| `cluster_oplog_size`                   | `DIANA_DB_CLUSTER_OPLOG_SIZE`           | Integer       | Changes kept for servers that reconnect (default `100000`)                              |
+| `memory_reserve_percent`               | `DIANA_DB_MEMORY_RESERVE_PERCENT`       | Integer 1–50  | Refuse requests below this free share (5)                                               |
 
 ```ini
 # /etc/diana-db/diana-db.conf
@@ -290,11 +306,67 @@ store_strategy=local
 ## Security
 
 - **TLS / mTLS.** Connections can be encrypted in transit, with optional mutual TLS so the server verifies client identity via certificates.
-- **The password is never transmitted.** The client identifies itself with a username; every request and response is then encrypted with **AES-256-GCM** using a key derived from the user's password. Tampered or wrongly-keyed requests fail authentication and are rejected.
+- **The password is never transmitted.** Client and server prove to each other that they know it (a salted challenge and response, the password stretched with scrypt), and every request and response is then encrypted with **AES-256-GCM** using a key made for that connection only. Tampered or wrongly-keyed requests fail authentication and are rejected.
+- **Stored credentials are salted.** `diana-db add-user` stores a per-user random salt and verifiers, not the password.
 - **Segregated access control.** Access is granted per user and per database — read, write, or manage.
 - **Private storage.** Dumps and backups can be written to a private S3-compatible bucket.
 
 > Passwords are never sent over the wire, but connection metadata is sent in plaintext at connection start. Enable TLS if metadata confidentiality matters.
+
+**Upgrading from 4.0.** The handshake above is protocol 2, new in 4.1. Both sides still speak the 4.0 protocol:
+
+- ODM 4.1 falls back to it when the server is older than 4.1. Pass `legacyAuth: false` (or `?legacyAuth=false`) to refuse that.
+- Server 4.1 accepts 4.0 clients while `legacy_auth` is on (the default). Users created before 4.1 work with both protocols without any change.
+- When every client is on 4.1, set `legacy_auth=no`.
+
+---
+
+## Monitoring
+
+The server answers HTTP on `http_port` (`34568`), by default on `127.0.0.1` only:
+
+| Route          | Answer                                                                                                            |
+| -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `GET /health`  | `200` and the server state as JSON; `503` while requests are refused because memory is exhausted                  |
+| `GET /metrics` | Prometheus text format: requests by action, memory, write-ahead log, snapshots, documents per collection, cluster |
+
+```bash
+curl http://127.0.0.1:34568/health
+```
+
+To reach it from another machine set `http_host` (for example `0.0.0.0`) and `http_token`; requests then need `Authorization: Bearer <token>`. `http=no` turns the HTTP server off. A busy `http_port` is logged and the database keeps running.
+
+---
+
+## Replication
+
+Several servers can hold the same data, and each of them accepts reads and writes (multi-master). Every server lists the others:
+
+```ini
+# server 1 (10.0.0.1); servers 2 and 3 are configured the same way with their own server_id and peers
+server_id=dianadbnode1
+cluster_secret=<the same on every server, 16 or more characters>
+cluster_peers=10.0.0.2:34569,10.0.0.3:34569
+```
+
+`server_id` is required in a cluster and must differ on every server. A cluster needs `store_strategy=local` and the write-ahead log. The server does not start when a cluster setting is missing, and says which one.
+
+How it behaves:
+
+- A write is confirmed by the server that received it and reaches the others right after (asynchronously). A read on another server may not see it for a moment.
+- Two servers changing **different fields** of one document: both changes are kept. The **same field**: the newest write wins everywhere. Server clocks are compared, so keep them synchronized (NTP); `/metrics` reports the difference.
+- A removal wins over changes made to the same document elsewhere at the same time. Removals are remembered for `cluster_tombstone_ttl`.
+- Collections, schema changes, views and vectors replicate. A transaction replicates when it is committed.
+- A server that was down gets what it missed when it returns. A new server, or one away for longer than `cluster_oplog_size` changes, receives the whole state and merges it. A server that was away for longer than `cluster_tombstone_ttl` must start with an empty data directory, otherwise documents removed meanwhile can come back.
+- Connections between servers are authenticated with `cluster_secret` and encrypted.
+
+Limits to know before using it:
+
+- **`unique` is checked on the server that accepts the write.** Two servers can accept the same unique value at the same moment; both documents then exist.
+- **Command updates** (`$inc` and similar) replicate as the resulting value. Two servers incrementing the same field at the same moment end with one of the two results, not the sum.
+- **Transactions are atomic on the server that runs them.** Other servers receive their changes one by one, and locks are not shared between servers.
+- **Users and access rights are per server.** Run `add-user` and `grant-access` on each of them.
+- Clients connect to one server. The ODM does not switch to another server by itself.
 
 ---
 
@@ -367,8 +439,10 @@ You can create as many instances as you like — each has its own migrations and
 | `database`              | string                                                   | –         | –            |
 | `secureServer`          | boolean                                                  | `false`   | –            |
 | `tls`                   | `{ cert?, key?, ca?, rejectUnauthorized?, servername? }` | –         | –            |
+| `legacyAuth`            | boolean                                                  | `true`    | –            |
 | `logger`                | object                                                   | `console` | –            |
 
+- `legacyAuth: false` refuses servers older than 4.1 instead of falling back to their handshake (see [Security](#security)). Also accepted as `?legacyAuth=false` in a connection string.
 - `database` is used by `migrateUp`, `migrateDown` and `getMigrations` when they are called without one.
 - `tls` values are Buffers (`readFileSync`) or PEM strings; `ca` may be an array. Other Node.js `tls.connect` options pass through. `cert`/`key` are only needed when the server verifies clients (mTLS).
 - `rejectUnauthorized` defaults to `false`, so self-signed servers work out of the box. **Set it to `true` with `ca` in production**: the certificate is then checked against `host` (or `servername`), so connect by the name in the certificate, not by IP.
@@ -541,6 +615,19 @@ const user = await userModel.insert({
 ```
 
 `_id` is added automatically. Fields with `default` are filled when absent; fields with `set` pass through the setter before validation. The returned document is a plain object with no special methods.
+
+To insert many documents use `insertMany`: one request per batch instead of one per document (about 40 times faster for 10,000 small documents on one connection).
+
+```typescript
+const users = await userModel.insertMany([
+  { name: 'John' },
+  { name: 'Jane' },
+]);
+// optional: a transaction, and the batch size (default 1000, up to 10000)
+await userModel.insertMany(documents, transactionId, 5000);
+```
+
+It returns the inserted documents in the given order. A batch is inserted completely or not at all: if one document is invalid, the error names its position and nothing of that batch is stored. Batches already sent stay inserted, so use a transaction when all documents must be stored together. Requires server 4.1 or newer.
 
 ---
 
@@ -966,6 +1053,7 @@ Server and ODM versions are released in step and must be kept compatible.
 
 Recent highlights:
 
+- **v4.1.0** — `insertMany`, salted challenge-response authentication (protocol 2), HTTP `/health` and `/metrics`, multi-master replication, strict `server_id`, shorter pauses while snapshots are saved
 - **v4.0.0** — vectors
 - **v3.3.3** — core optimizations and refactoring
 - **v2.5.3** — client-level database management (`createDatabase`, `removeDatabase`, `createCollection`, `removeCollection`), `replaceRoot` in `LookupQuery`, core optimizations
@@ -990,8 +1078,7 @@ Full history: <https://diana-db.com/changes-log>
 - **Desktop Management Tool** — GUI for managing your databases
 - **Query Language Improvements** — making DiQL more expressive and powerful
 - **Golang, PHP, C#, Java clients** — official clients to extend integration across ecosystems
-- **Vectors** — vector data type and similarity search
-- **Multi-Server Replication** — real-time synchronization and high availability across nodes in different data centres
+- **Vector index** — approximate nearest-neighbour search for large collections
 
 ---
 
