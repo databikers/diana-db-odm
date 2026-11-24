@@ -109,6 +109,7 @@ export async function startServer({
     dir,
     port,
     url: (user = 'admin', password = 'password') => `diana-db://${user}:${password}@127.0.0.1:${port}`,
+    options: (extra = {}) => ({ host: '127.0.0.1', port, user: 'admin', password: 'password', ...extra }),
     output: () => output,
     async stop({ keep = false } = {}) {
       if (child.exitCode === null) {
