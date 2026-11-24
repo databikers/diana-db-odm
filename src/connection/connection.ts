@@ -46,6 +46,10 @@ export class Connection {
   private proof: Proof;
   private sessionKey: Buffer;
   private ownProtocol: 1 | 2 = 2;
+  // "hello" was written to the current socket: only then a close without a challenge says anything about the server
+  private helloSent: boolean = false;
+  // the server has completed a protocol 2 handshake on this connection: it is never taken for an older one again
+  private protocol2Proven: boolean = false;
 
   constructor(options: ConnectOptions) {
     this.options = options;
@@ -131,6 +135,7 @@ export class Connection {
     this.partsLength = 0;
     this.receivedResponse = false;
     this.stage = 'hello';
+    this.helloSent = false;
     this.proof = undefined;
     this.sessionKey = undefined;
     socket.setNoDelay(true);
@@ -179,6 +184,7 @@ export class Connection {
       return;
     }
     this.nonce = clientNonce();
+    this.helloSent = true;
     socket.write(`hello:2:${this.options.user}:${this.nonce}${this.options.isSubscriber ? ':subscriber' : ''}\n`);
   }
 
@@ -234,6 +240,7 @@ export class Connection {
       return;
     }
     this.sessionKey = this.proof.key;
+    this.protocol2Proven = true;
     this.proof = undefined;
     this.ready();
   }
@@ -265,12 +272,15 @@ export class Connection {
     }
     const wasConnected: boolean = this._connected;
     const stage: 'hello' | 'proof' | 'ready' = this.stage;
+    const helloSent: boolean = this.helloSent;
+    this.helloSent = false;
     this._connected = false;
     this.parts = [];
     this.partsLength = 0;
     this.sessionKey = undefined;
-    if (this.started && this.protocol === 2 && stage === 'hello' && this.activeSocket) {
+    if (this.started && this.protocol === 2 && stage === 'hello' && helloSent && !this.protocol2Proven) {
       // Closed after "hello" without a challenge: a server before 4.6.5, which can't read the line.
+      // A connection that was never established (the server is down or restarting) says nothing about its version.
       if (this.options.legacyAuth === false) {
         this.authenticationFailed(
           socket,
