@@ -115,3 +115,28 @@ test(
     }
   },
 );
+
+test('after a server restart the client still uses protocol 2', { skip }, async () => {
+  const { lines, logger } = captureLogger();
+  let strict = await startServer({ env: { DIANA_DB_LEGACY_AUTH: 'no' } });
+  const db = new DianaDb(strict.options({ logger, reconnectTimeoutValue: 100 }));
+  try {
+    await db.connect(5000);
+    await strict.stop({ keep: true });
+    // long enough for several refused attempts to reconnect
+    await new Promise((r) => setTimeout(r, 600));
+    strict = await startServer({ env: { DIANA_DB_LEGACY_AUTH: 'no' }, dir: strict.dir, port: strict.port });
+    let version;
+    for (let attempt = 0; attempt < 50 && !version; attempt++) {
+      version = await db.getVersion().then(
+        (answer) => answer.version,
+        () => new Promise((r) => setTimeout(r, 100)),
+      );
+    }
+    assert.ok(version, 'the client works again after the restart');
+    assert.ok(!lines.some((line) => /legacy authentication/.test(line)), lines.join('\n'));
+  } finally {
+    await db.disconnect();
+    await strict.stop();
+  }
+});
