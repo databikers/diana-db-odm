@@ -1,5 +1,5 @@
 // Compiled by "npm run test:types": this file must type-check, and the lines marked @ts-expect-error must not.
-import { DianaDb, Model, Schema, Types } from '../../dist';
+import { DianaDb, HealthInfo, Model, Schema, Types } from '../../dist';
 
 type User = { name: string; age: number; tags: string[]; seenAt: string };
 
@@ -30,4 +30,18 @@ export async function usage(dianaDb: DianaDb): Promise<void> {
   await users.find([{}], undefined, { age: 2 });
   // @ts-expect-error a field that is not in the document type
   await users.find([{}], undefined, { unknown: 1 });
+
+  // getHealth: the load numbers and, from server 4.1.0 on, the memory guard
+  const health: HealthInfo = await dianaDb.getHealth();
+  const load: number = health.memory + health.cpu + health.gcp + health.elu + health.eld;
+  const refusing: boolean | undefined = health.memoryGuard?.exhausted;
+  const left: number | undefined = health.memoryGuard && health.memoryGuard.limit - health.memoryGuard.used;
+  // @ts-expect-error memoryGuard is missing in the answers of older servers
+  const unchecked: boolean = health.memoryGuard.exhausted;
+  void [
+    load,
+    refusing,
+    left,
+    unchecked,
+  ];
 }
