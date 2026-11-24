@@ -12,6 +12,7 @@ export const skip = SERVER_DIST ? false : 'set DIANA_DB_SERVER_DIST to a built s
 let nextPort = 37000 + Math.floor(Math.random() * 2000);
 
 export async function startServer({
+  dist = SERVER_DIST,
   databases = ['test'],
   env = {},
   users = [
@@ -47,7 +48,7 @@ export async function startServer({
       password,
     ] of users) {
       execFileSync(process.execPath, [
-        join(SERVER_DIST, 'diana-db.js'),
+        join(dist, 'diana-db.js'),
         'add-user',
         '-c',
         conf,
@@ -58,7 +59,7 @@ export async function startServer({
       ]);
       for (const db of databases) {
         execFileSync(process.execPath, [
-          join(SERVER_DIST, 'diana-db.js'),
+          join(dist, 'diana-db.js'),
           'grant-access',
           '-c',
           conf,
@@ -74,7 +75,7 @@ export async function startServer({
     process.execPath,
     [
       '--expose-gc',
-      join(SERVER_DIST, 'diana-db-server.js'),
+      join(dist, 'diana-db-server.js'),
     ],
     {
       env: {
