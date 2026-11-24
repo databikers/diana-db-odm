@@ -4,7 +4,8 @@ import { v } from './rules';
 /** Every _id a DianaDB server may have stored (see the server's helpers/object-id-helper). */
 export const OBJECT_ID_REGEXP: RegExp = /^(?:[A-Za-z0-9_]{1,64})?-[0-9a-f]{4,8}-[0-9a-f]{11}-[0-9a-f]{9}$/;
 
-const pointer = v.string().regex(/^\$[A-Za-z]+[A-Za-z0-9_]+/);
+// '$' and a property name, which may be one letter
+const pointer = v.string().regex(/^\$[A-Za-z][A-Za-z0-9_]*/);
 
 const pemInput = v.alternatives(v.string(), v.binary());
 
@@ -47,14 +48,15 @@ const numberFieldExtended = v.alternatives(
 );
 
 const stringField = v.alternatives(
-  v.string(),
+  // an empty string is a string
+  v.string().allow(''),
   pointer,
   v.object({
     $concat: v.object({
       delimiter: v.string().required(),
       parts: v.array().items(v.string()),
     }),
-    $replace: v.array().min(3).max(3).items(v.string()),
+    $replace: v.array().min(3).max(3).items(v.string().allow('')),
   }),
 );
 const objectIdField = v.alternatives(
@@ -154,10 +156,10 @@ const geoQuery = v.object({
 const stringQuery = v.alternatives().try(
   v.object({
     $regex: v.string(),
-    $in: v.array().items(v.string()),
-    $nin: v.array().items(v.string()),
-    $eq: v.string(),
-    $ne: v.string(),
+    $in: v.array().items(v.string().allow('')),
+    $nin: v.array().items(v.string().allow('')),
+    $eq: v.string().allow(''),
+    $ne: v.string().allow(''),
     $startsWith: v.string(),
     $notStartsWith: v.string(),
     $endsWith: v.string(),
@@ -165,7 +167,7 @@ const stringQuery = v.alternatives().try(
     $cn: v.string(),
     $nc: v.string(),
   }),
-  v.string(),
+  v.string().allow(''),
 );
 
 const objectIdQuery = v.alternatives().try(
@@ -345,7 +347,8 @@ const projectionSchema = v
     $subtract: v.array().items(v.number(), pointer),
     $divide: v.array().items(v.number().disallow(0), pointer),
     $multiply: v.array().items(v.number(), pointer),
-    $ifNull: v.array().items(v.number(), pointer),
+    // pointers are read from the document; other values are taken as they are
+    $ifNull: v.array().min(1).items(v.number(), v.string(), v.boolean()),
     $max: pointer,
     $min: pointer,
     $avg: pointer,
@@ -383,14 +386,14 @@ const transformQueries = v.array().items(
         foreignField: v.string().required(),
         filter: v.any(),
         replaceRoot: pointer,
-        sort: v.object().pattern(/^/, v.number().integer().allow(-1, 1)).min(1),
+        sort: v.object().pattern(/^/, v.number().valid(-1, 1)).min(1),
         skip: v.number().positive().integer().allow(0),
         limit: v.number().positive().integer(),
       }),
       $match: v
         .object()
         .pattern(/^/, v.alternatives(booleanQuery, stringQuery, numberQuery, timeQuery, geoQuery, objectIdQuery)),
-      $sort: v.object().pattern(/^/, v.number().integer().allow(-1, 1)).min(1),
+      $sort: v.object().pattern(/^/, v.number().valid(-1, 1)).min(1),
       $unwind: pointer,
       $replaceRoot: pointer,
       $group: v
@@ -408,10 +411,7 @@ const transformQueries = v.array().items(
     .max(1),
 );
 
-const sortQuery = v.alternatives(
-  v.number().integer().allow(-1, 1),
-  v.object().pattern(/^/, v.number().integer().allow(-1, 1)).min(1),
-);
+const sortQuery = v.alternatives(v.number().valid(-1, 1), v.object().pattern(/^/, v.number().valid(-1, 1)).min(1));
 
 export {
   modelOptions,

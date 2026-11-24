@@ -163,7 +163,7 @@ export class Validator<T> {
   }
 
   public limit(limit: any) {
-    if (!Number.isInteger(limit) || limit < 0) {
+    if (!Number.isInteger(limit) || limit < 1) {
       throw ErrorFactory.limitError(`property 'limit' should be positive integer`);
     }
   }

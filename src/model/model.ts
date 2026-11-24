@@ -220,7 +220,7 @@ export class Model<T> {
       this.validator.skip(skip);
       request.skip = skip;
     }
-    if (limit) {
+    if (limit !== undefined && limit !== null) {
       this.validator.limit(limit);
       request.limit = limit;
     }
@@ -277,7 +277,7 @@ export class Model<T> {
       this.validator.skip(skip);
       request.skip = skip;
     }
-    if (limit) {
+    if (limit !== undefined && limit !== null) {
       this.validator.limit(limit);
       request.limit = limit;
     }
