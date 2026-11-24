@@ -83,6 +83,8 @@ export async function startServer({
         DIANA_DB_DUMP_DIRECTORY: dir,
         DIANA_DB_LOG_DIRECTORY: dir,
         DIANA_DB_PORT: String(port),
+        // the tests start several servers: without this they would all try the default HTTP port
+        DIANA_DB_HTTP: 'no',
         ...env,
       },
       stdio: [
