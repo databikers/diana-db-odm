@@ -14,3 +14,4 @@ export { DatabaseUpdate } from './parameters';
 export { TlsOptions } from './options';
 export { DianaDbError, DianaDbErrorCode } from './error';
 export { TransactionInfo } from './dto/transaction-info';
+export { HealthInfo, MemoryGuardInfo } from './dto/health-info';

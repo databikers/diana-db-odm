@@ -7,7 +7,7 @@ import {
   DEFAULT_REQUEST_TIMEOUT_VALUE,
   DEFAULT_SERVER_PORT,
 } from '@const';
-import { Request, TransactionInfo, Migration, MigrationInfo, TransformQuery } from '@dto';
+import { Request, TransactionInfo, Migration, MigrationInfo, TransformQuery, HealthInfo } from '@dto';
 import { DatabaseUpdate, ManageTransactionParameters, StartTransactionParameters } from '@parameters';
 import { parseConnectionString } from '@helper';
 import { DianaDbOptions } from '@options';
@@ -223,7 +223,7 @@ export class DianaDb {
     return this.request({ action: ClientAction.GET_COLLECTION_VIEWS, database, collection });
   }
 
-  public getHealth(): Promise<Record<'memory' | 'cpu' | 'gcp' | 'elu' | 'eld', number>> {
+  public getHealth(): Promise<HealthInfo> {
     return this.request({ action: ClientAction.GET_HEALTH });
   }
 
