@@ -8,7 +8,7 @@ If you already know MongoDB, onboarding is quick — the query language is conce
 
 |                     |                                                                |
 | ------------------- | -------------------------------------------------------------- |
-| **Current release** | Server v4.6.5 / ODM v4.6.5                                     |
+| **Current release** | Server v4.6.13 / ODM v4.6.9                                    |
 | **ODM package**     | [`@diana-db/odm`](https://www.npmjs.com/package/@diana-db/odm) |
 | **Documentation**   | [diana-db.com](https://diana-db.com)                           |
 | **License**         | MIT with a usage restriction — see [License](#license)         |
